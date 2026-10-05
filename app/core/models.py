@@ -159,6 +159,44 @@ class CleanedRecord(BaseModel):
     LOCATION: Optional[str] = None
     CODE_NAME: Optional[str] = None
 
+    # Validation flags
+    is_valid: bool = True
+    validation_errors: List[str] = Field(default_factory=list)
+
+    def to_11_dict(self) -> Dict[str, Any]:
+        """Return exactly the 11 canonical columns in exact business order."""
+        return {
+            "COSTNAME": self.COSTNAME,
+            "CLIENTID": self.CLIENTID,
+            "GROUPCODE": self.GROUPCODE,
+            "MSNO": self.MSNO,
+            "NAME": self.NAME,
+            "SCHDATE": self.SCHDATE,
+            "RECAMOUNT": self.RECAMOUNT,
+            "MOBILENO": self.MOBILENO,
+            "SCHEME": self.SCHEME,
+            "COMMNAME": self.COMMNAME,
+            "COMMCODE": self.COMMCODE,
+        }
+
+
+class CleaningResult(BaseModel):
+    """Result and audit metrics for the cleaning pipeline stage."""
+    report_id: str
+    report_date: date
+    raw_count: int
+    cleaned_count: int
+    invalid_count: int = 0
+    duplicate_msno_count: int = 0
+    duplicate_msno_affected_count: int = 0
+    duplicate_clientid_count: int = 0
+    duplicate_clientid_affected_count: int = 0
+    blank_required_field_count: int = 0
+    invalid_amount_count: int = 0
+    total_recamount: float = 0.0
+    costname_summary: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    records: List[CleanedRecord] = Field(default_factory=list)
+
 
 class AggregationMetric(BaseModel):
     """Key metric aggregated by location or store."""

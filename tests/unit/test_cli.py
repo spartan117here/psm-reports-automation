@@ -82,3 +82,28 @@ def test_cli_auth_test_mocked_success(monkeypatch):
     with patch("requests.Session.post", return_value=fake_resp):
         exit_code = cmd_auth_test(args)
         assert exit_code == 0
+
+
+def test_cli_process_execution(capsys, sample_raw_payload):
+    """Verify 'process' command cleans, validates, and audits cleanly with exit code 0."""
+    from pathlib import Path
+    from unittest.mock import patch
+    from app.cli import cmd_process
+
+    parser = build_parser()
+    args = parser.parse_args(["process", "--report-date", "2026-10-04"])
+
+    mock_csv_path = Path("data/processed/2026/10/04/subhiksham_memberlist_2026-10-04.csv")
+    with patch("app.repositories.filesystem.FileSystemReportRepository.get_raw_report", return_value=sample_raw_payload), \
+         patch("app.repositories.filesystem.FileSystemReportRepository.save_cleaned_records", return_value=mock_csv_path):
+        exit_code = cmd_process(args)
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    output = captured.out
+
+    assert "Innervex Scheme Memberlist Cleaning & Audit" in output
+    assert "Raw records:                4" in output
+    assert "Cleaned records:            4" in output
+    assert "Cleaned CSV saved:          data/processed/2026/10/04/subhiksham_memberlist_2026-10-04.csv" in output
+    assert "Status: SUCCESS" in output

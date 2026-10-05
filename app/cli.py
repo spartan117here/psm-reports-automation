@@ -266,10 +266,84 @@ def cmd_download(args: argparse.Namespace) -> int:
 
 
 def cmd_process(args: argparse.Namespace) -> int:
-    """Phase 3/4 entrypoint: Clean and transform local stored raw data."""
+    """Clean, normalize, validate, and audit locally stored raw report data."""
+    import logging
+    from app.core.exceptions import TransformationError
+    from app.processing.cleaners import SchemeReportCleaner
+    from app.repositories.filesystem import FileSystemReportRepository
+
+    # Keep log output quiet during CLI execution
+    logging.getLogger("pothys_reporting").setLevel(logging.CRITICAL)
+
+    config_bundle = load_config()
     target_date = parse_target_date(args.report_date)
-    print(f"Process command invoked for report date: {target_date}")
-    print("Note: Offline processing engine is scaffolded and tested.")
+    report_id = args.report_id or "subhiksham"
+
+    if report_id not in config_bundle.reports.reports:
+        print(f"Error: Unknown report '{report_id}'")
+        return 1
+    report_cfg = config_bundle.get_report(report_id)
+
+    data_dir = config_bundle.project_root / config_bundle.app.storage.data_dir
+    repo = FileSystemReportRepository(data_dir)
+
+    # 1. Load raw report from disk
+    raw_payload = repo.get_raw_report(report_id, target_date)
+    if not raw_payload:
+        print("Innervex Scheme Memberlist Cleaning")
+        print("-----------------------------------")
+        print(f"Report: {report_cfg.display_name}")
+        print(f"Report date: {target_date.isoformat()}")
+        print("Status: FAILED")
+        print(f"Error: No raw report found for {target_date.isoformat()} under data/raw/")
+        return 1
+
+    # 2. Execute cleaning and validation
+    cleaner = SchemeReportCleaner(report_cfg)
+    try:
+        result = cleaner.clean_and_validate(raw_payload.data, report_date=target_date)
+    except TransformationError as e:
+        print("Innervex Scheme Memberlist Cleaning")
+        print("-----------------------------------")
+        print(f"Report: {report_cfg.display_name}")
+        print(f"Report date: {target_date.isoformat()}")
+        print("Status: FAILED")
+        print(f"Transformation Error: {e.message}")
+        return 1
+
+    # 3. Save cleaned dataset (both canonical CSV and JSON)
+    csv_path = repo.save_cleaned_records(report_id, target_date, result.records)
+    try:
+        rel_csv_path = str(csv_path.relative_to(config_bundle.project_root)).replace("\\", "/")
+    except ValueError:
+        rel_csv_path = str(csv_path).replace("\\", "/")
+
+    # 4. Print safe audit & reconciliation summary
+    report_title = "Subhiksham" if report_id == "subhiksham" else report_cfg.display_name
+    print("Innervex Scheme Memberlist Cleaning & Audit")
+    print("===========================================")
+    print(f"Report:                     {report_title}")
+    print(f"Report date:                {target_date.isoformat()}")
+    print(f"Raw records:                {result.raw_count}")
+    print(f"Cleaned records:            {result.cleaned_count}")
+    print(f"Invalid records:            {result.invalid_count}")
+    print(f"Duplicate MSNO count:       {result.duplicate_msno_count} (affected records: {result.duplicate_msno_affected_count})")
+    print(f"Duplicate CLIENTID count:   {result.duplicate_clientid_count} (affected records: {result.duplicate_clientid_affected_count})")
+    print(f"Blank required fields:      {result.blank_required_field_count}")
+    print(f"Invalid amount count:       {result.invalid_amount_count}")
+    print(f"Total RECAMOUNT:            {result.total_recamount:,.2f}")
+    print(f"Cleaned CSV saved:          {rel_csv_path}")
+    print(f"Cleaned columns (11):       {', '.join(report_cfg.output_columns)}")
+    print("\nCOSTNAME Summary Breakdown:")
+    print("-" * 55)
+    print(f"{'COSTNAME':<20} | {'Count':<8} | {'Total RECAMOUNT':<18}")
+    print("-" * 55)
+    for c, stats in result.costname_summary.items():
+        print(f"{c:<20} | {stats['count']:<8} | {stats['total_amount']:<18,.2f}")
+    print("-" * 55)
+    print(f"{'TOTAL':<20} | {result.cleaned_count:<8} | {result.total_recamount:<18,.2f}")
+    print("=" * 55)
+    print("Status: SUCCESS")
     return 0
 
 

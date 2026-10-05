@@ -1,5 +1,6 @@
 """Filesystem-backed repository implementation for raw data, processed data, and run metadata."""
 
+import csv
 from datetime import date, datetime
 import json
 import logging
@@ -77,28 +78,62 @@ class FileSystemReportRepository(ReportRepository):
         self, report_id: str, report_date: date, records: List[CleanedRecord]
     ) -> Path:
         folder = self._get_partition_dir(self.processed_root, report_date)
-        timestamp_str = datetime.now().strftime("%H%M%S")
-        filename = f"{report_id}_cleaned_{timestamp_str}.json"
-        target_path = folder / filename
+        date_str = report_date.isoformat()
 
-        dumpable = [r.model_dump(mode="json") for r in records]
-        with open(target_path, "w", encoding="utf-8") as f:
+        # 1. Save canonical 11-column CSV
+        csv_filename = f"{report_id}_memberlist_{date_str}.csv"
+        csv_path = folder / csv_filename
+        columns = [
+            "COSTNAME", "CLIENTID", "GROUPCODE", "MSNO", "NAME",
+            "SCHDATE", "RECAMOUNT", "MOBILENO", "SCHEME", "COMMNAME", "COMMCODE"
+        ]
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=columns)
+            writer.writeheader()
+            for r in records:
+                writer.writerow(r.to_11_dict())
+
+        # 2. Save JSON representation
+        json_filename = f"{report_id}_memberlist_{date_str}.json"
+        json_path = folder / json_filename
+        dumpable = [r.to_11_dict() for r in records]
+        with open(json_path, "w", encoding="utf-8") as f:
             json.dump(dumpable, f, indent=2)
 
-        logger.info(f"Saved {len(records)} cleaned records to: {target_path}")
-        return target_path
+        logger.info(f"Saved {len(records)} cleaned records to CSV: {csv_path} and JSON: {json_path}")
+        return csv_path
 
     def get_cleaned_records(
         self, report_id: str, report_date: date
     ) -> Optional[List[CleanedRecord]]:
         folder = self._get_partition_dir(self.processed_root, report_date)
-        matches = sorted(folder.glob(f"{report_id}_cleaned_*.json"), reverse=True)
-        if not matches:
-            return None
+        matches = sorted(
+            list(folder.glob(f"{report_id}_memberlist_*.json"))
+            + list(folder.glob(f"{report_id}_cleaned_*.json")),
+            reverse=True,
+        )
+        if matches:
+            with open(matches[0], "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return [CleanedRecord(**item) for item in data]
 
-        with open(matches[0], "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return [CleanedRecord(**item) for item in data]
+        # CSV fallback
+        csv_matches = sorted(folder.glob(f"{report_id}_memberlist_*.csv"), reverse=True)
+        if csv_matches:
+            with open(csv_matches[0], "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                records = []
+                for row in reader:
+                    amt_str = row.get("RECAMOUNT", "0")
+                    try:
+                        amt = float(amt_str) if amt_str else 0.0
+                    except ValueError:
+                        amt = 0.0
+                    row_copy = dict(row)
+                    row_copy["RECAMOUNT"] = amt
+                    records.append(CleanedRecord(**row_copy))
+                return records
+        return None
 
 
 class FileSystemRunRepository(RunRepository):
