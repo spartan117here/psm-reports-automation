@@ -50,14 +50,17 @@ def test_cli_dry_run_execution():
 
 def test_cli_auth_test_missing_credentials(monkeypatch):
     """Verify 'auth-test' handles missing credentials cleanly with exit code 1."""
-    monkeypatch.delenv("INNERVEX_USERNAME", raising=False)
-    monkeypatch.delenv("INNERVEX_PASSWORD", raising=False)
-
+    from unittest.mock import patch
     from app.cli import cmd_auth_test
+
     parser = build_parser()
     args = parser.parse_args(["auth-test"])
-    exit_code = cmd_auth_test(args)
-    assert exit_code == 1
+
+    with patch("app.core.config.load_dotenv"):
+        monkeypatch.delenv("INNERVEX_USERNAME", raising=False)
+        monkeypatch.delenv("INNERVEX_PASSWORD", raising=False)
+        exit_code = cmd_auth_test(args)
+        assert exit_code == 1
 
 
 def test_cli_auth_test_mocked_success(monkeypatch):
