@@ -163,6 +163,49 @@ def cmd_process(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_auth_test(args: argparse.Namespace) -> int:
+    """Safely test authentication against the Innervex system without exposing secrets."""
+    import logging
+    import requests
+    from app.core.exceptions import AuthenticationError, InnervexConnectionError
+    from app.innervex.auth import InnervexAuthenticator
+
+    # Keep log output quiet during auth-test so only the clean report is presented
+    logging.getLogger("pothys_reporting").setLevel(logging.CRITICAL)
+
+    config_bundle = load_config()
+    authenticator = InnervexAuthenticator(config_bundle.innervex)
+
+    print("Innervex authentication test")
+    print("----------------------------")
+    print(f"Base URL: {config_bundle.innervex.base_url}")
+
+    try:
+        session = requests.Session()
+        result = authenticator.login(session=session)
+        print(f"HTTP status: {result.http_status}")
+        print(f"Authenticated: {result.authenticated}")
+        print(f"Session cookie present: {result.cookies_present}")
+        print(f"Token present: {result.token_present}")
+        return 0
+    except AuthenticationError as e:
+        status_code = e.details.get("status_code", "Failed") if hasattr(e, "details") else "Failed"
+        print(f"HTTP status: {status_code}")
+        print("Authenticated: False")
+        print("Session cookie present: False")
+        print("Token present: False")
+        print(f"\nAuthentication failed: {e.message}")
+        return 1
+    except InnervexConnectionError as e:
+        print("Authenticated: False")
+        print(f"\nConnection error: {e.message}")
+        return 1
+    except Exception as e:
+        print("Authenticated: False")
+        print(f"\nUnexpected error during authentication: {type(e).__name__}: {e}")
+        return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -204,6 +247,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Target report date to audit",
+    )
+
+    # Command: auth-test
+    subparsers.add_parser(
+        "auth-test",
+        help="Safely test authentication against Innervex using environment credentials",
     )
 
     # Command: download
@@ -251,6 +300,8 @@ def main() -> None:
         sys.exit(cmd_run(args))
     elif args.command == "validate":
         sys.exit(cmd_validate(args))
+    elif args.command == "auth-test":
+        sys.exit(cmd_auth_test(args))
     elif args.command == "download":
         sys.exit(cmd_download(args))
     elif args.command == "process":

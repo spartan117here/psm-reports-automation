@@ -16,12 +16,12 @@ innervex:
     Content-Type: "application/x-www-form-urlencoded; charset=UTF-8"
     Accept: "application/json, text/javascript, */*; q=0.01"
 
-  # Authentication Strategy Configuration (Phase 1 Target)
-  # IMPORTANT: Do NOT guess login endpoints or credentials.
-  # The strategy and parameters will be populated in Phase 1 after authorized review.
+  # Authentication Strategy Configuration (Phase 1 Confirmed)
   auth:
     strategy: "session_cookie"  # Pluggable: session_cookie, form_login, basic, token
-    login_endpoint: null         # Set in Phase 1 (e.g., /login or form post action)
+    login_endpoint: "/login.ispx" # Confirmed login endpoint
+    login_page: "/signin.ispx"    # Confirmed login page
+    login_action: "Sign in"       # Confirmed Action form parameter
     login_method: "POST"
     username_field: "username"
     password_field: "password"

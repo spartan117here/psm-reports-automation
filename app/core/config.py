@@ -72,7 +72,9 @@ class AppConfig(BaseModel):
 
 class InnervexAuthConfig(BaseModel):
     strategy: str = "session_cookie"
-    login_endpoint: Optional[str] = None
+    login_endpoint: Optional[str] = "/login.ispx"
+    login_page: str = "/signin.ispx"
+    login_action: str = "Sign in"
     login_method: str = "POST"
     username_field: str = "username"
     password_field: str = "password"

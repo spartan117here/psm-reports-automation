@@ -46,3 +46,36 @@ def test_cli_dry_run_execution():
     args = parser.parse_args(["run", "--dry-run", "--report-date", "2026-10-04", "--force"])
     exit_code = cmd_run(args)
     assert exit_code == 0
+
+
+def test_cli_auth_test_missing_credentials(monkeypatch):
+    """Verify 'auth-test' handles missing credentials cleanly with exit code 1."""
+    monkeypatch.delenv("INNERVEX_USERNAME", raising=False)
+    monkeypatch.delenv("INNERVEX_PASSWORD", raising=False)
+
+    from app.cli import cmd_auth_test
+    parser = build_parser()
+    args = parser.parse_args(["auth-test"])
+    exit_code = cmd_auth_test(args)
+    assert exit_code == 1
+
+
+def test_cli_auth_test_mocked_success(monkeypatch):
+    """Verify 'auth-test' succeeds with exit code 0 when mock returns 200."""
+    from unittest.mock import MagicMock, patch
+    import requests
+
+    monkeypatch.setenv("INNERVEX_USERNAME", "test_user")
+    monkeypatch.setenv("INNERVEX_PASSWORD", "test_pass")
+
+    fake_resp = MagicMock(spec=requests.Response)
+    fake_resp.status_code = 200
+    fake_resp.json.return_value = {"status": True, "token": "mock-token-abc"}
+
+    from app.cli import cmd_auth_test
+    parser = build_parser()
+    args = parser.parse_args(["auth-test"])
+
+    with patch("requests.Session.post", return_value=fake_resp):
+        exit_code = cmd_auth_test(args)
+        assert exit_code == 0
