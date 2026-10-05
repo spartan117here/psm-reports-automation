@@ -1,0 +1,38 @@
+# ==============================================================================
+# Innervex System Connectivity & Endpoint Configuration
+# ==============================================================================
+
+innervex:
+  # Base network address on company LAN
+  base_url: "http://192.168.5.213:4499"
+  timeout_seconds: 60
+  max_retries: 3
+  backoff_factor: 2.0
+
+  # Common observed headers
+  default_headers:
+    User-Agent: "PothysReportingAutomation/0.1.0"
+    X-Requested-With: "XMLHttpRequest"
+    Content-Type: "application/x-www-form-urlencoded; charset=UTF-8"
+    Accept: "application/json, text/javascript, */*; q=0.01"
+
+  # Authentication Strategy Configuration (Phase 1 Target)
+  # IMPORTANT: Do NOT guess login endpoints or credentials.
+  # The strategy and parameters will be populated in Phase 1 after authorized review.
+  auth:
+    strategy: "session_cookie"  # Pluggable: session_cookie, form_login, basic, token
+    login_endpoint: null         # Set in Phase 1 (e.g., /login or form post action)
+    login_method: "POST"
+    username_field: "username"
+    password_field: "password"
+    session_cookie_name: "JSESSIONID"
+    # Secrets referenced via environment variables
+    env_username_key: "INNERVEX_USERNAME"
+    env_password_key: "INNERVEX_PASSWORD"
+
+  # Known Report Endpoints
+  endpoints:
+    # Confirmed observed endpoint for Scheme New Memberlist (Subhiksham & Viruksham)
+    scheme_new_cust_rep: "/schemeNewCustRep"
+    # Scheme Closing Report endpoint (subject to Phase 7 verification)
+    scheme_closing_rep: "/schemeClosingReport"

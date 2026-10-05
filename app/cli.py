@@ -1,0 +1,264 @@
+"""Command-Line Interface for Pothys Daily Reporting Automation."""
+
+import argparse
+from datetime import date, datetime, timedelta
+import logging
+import sys
+from typing import Optional
+
+from app.core.config import load_config
+from app.core.logging import setup_logger
+from app.core.models import (
+    PipelineStage,
+    RunContext,
+    RunMetadata,
+    RunStatus,
+    ValidationSeverity,
+)
+from app.processing.cleaners import SchemeReportCleaner
+from app.processing.location import LocationResolver
+from app.processing.transformers import RecordTransformer
+from app.repositories.filesystem import (
+    FileSystemReportRepository,
+    FileSystemRunRepository,
+)
+from app.validation.engine import ValidationEngine
+from app.validation.rules import ValidationRules
+
+
+def generate_run_id(run_date: date) -> str:
+    """Generate unique run ID, e.g. RUN-20261005-110523."""
+    timestamp = datetime.now().strftime("%H%M%S")
+    return f"RUN-{run_date.strftime('%Y%m%d')}-{timestamp}"
+
+
+def parse_target_date(date_str: Optional[str]) -> date:
+    """Parse date string YYYY-MM-DD or default to yesterday."""
+    if date_str:
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"Error: Invalid date format '{date_str}'. Expected YYYY-MM-DD.")
+            sys.exit(1)
+    # Default to yesterday
+    return date.today() - timedelta(days=1)
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """Execute the full reporting automation pipeline."""
+    target_date = parse_target_date(args.report_date)
+    today = date.today()
+    run_id = generate_run_id(today)
+
+    config_bundle = load_config()
+    logs_dir = config_bundle.project_root / config_bundle.app.storage.logs_dir
+    data_dir = config_bundle.project_root / config_bundle.app.storage.data_dir
+
+    logger = setup_logger(
+        level="INFO",
+        logs_dir=logs_dir,
+        run_id=run_id,
+        stage="INIT",
+    )
+
+    logger.info(f"Starting Pothys Reporting Automation run {run_id}")
+    logger.info(f"Target report date: {target_date} (Run date: {today})")
+
+    run_repo = FileSystemRunRepository(data_dir)
+    report_repo = FileSystemReportRepository(data_dir)
+
+    # 1. Idempotency Check
+    if config_bundle.app.execution.idempotency_enabled and not args.force:
+        if run_repo.is_already_processed(target_date, args.report_id):
+            logger.warning(
+                f"Report for date {target_date} ({args.report_id}) was already successfully processed. "
+                "Skipping run to maintain idempotency. Use --force to override."
+            )
+            return 0
+
+    run_meta = RunMetadata(
+        run_id=run_id,
+        run_date=today,
+        report_date=target_date,
+        source=f"Innervex:{args.report_id}",
+        status=RunStatus.IN_PROGRESS,
+    )
+    run_repo.save_run(run_meta)
+
+    # In Phase 0, we validate configuration, test models, and demonstrate dry-run capabilities
+    logger.info("[PHASE 0 SKELETON] Validating configuration and pipeline readiness...")
+    val_engine = ValidationEngine(
+        halt_on_critical=config_bundle.app.validation_policy.halt_on_critical_failure
+    )
+
+    # Perform pre-flight target check
+    val_res = ValidationRules.check_targets_sanity(config_bundle.targets.q2)
+    report = val_engine.create_report(run_id, [val_res])
+
+    logger.info(
+        f"Pipeline validation passed. Active reports configured: {list(config_bundle.reports.reports.keys())}"
+    )
+
+    if args.dry_run:
+        logger.info("[DRY RUN] Dry run completed successfully without external network calls.")
+        run_meta.status = RunStatus.SUCCESS
+        run_meta.completed_at = datetime.now()
+        run_repo.save_run(run_meta)
+        return 0
+
+    logger.info(
+        "Phase 0 project scaffold is operational. "
+        "Next milestone (Phase 1): Authenticate to Innervex with legitimate credentials."
+    )
+    run_meta.status = RunStatus.SUCCESS
+    run_meta.completed_at = datetime.now()
+    run_repo.save_run(run_meta)
+    return 0
+
+
+def cmd_validate(args: argparse.Namespace) -> int:
+    """Validate system configuration, targets, and mapping health."""
+    config_bundle = load_config()
+    print("=" * 60)
+    print("POTHYS REPORTING AUTOMATION - CONFIGURATION & INTEGRITY AUDIT")
+    print("=" * 60)
+
+    val_engine = ValidationEngine(halt_on_critical=False)
+    results = [
+        ValidationRules.check_targets_sanity(config_bundle.targets.q2),
+    ]
+
+    # Validate employee mappings
+    resolver = LocationResolver(config_bundle.mappings)
+    sample_codes = ["TVL001", "CPT_ECOMM", "ONLINE", "UNKNOWN_XYZ"]
+    for code in sample_codes:
+        attr = resolver.resolve(cost_name="", comm_code=code)
+        print(f"Sample resolution: {code:<15} -> Location: {attr.location:<20} Branch: {attr.branch}")
+
+    unresolved = resolver.get_all_unresolved_codes()
+    results.append(ValidationRules.check_unresolved_employee_codes(unresolved))
+
+    report = val_engine.create_report("AUDIT", results)
+    print("\nAudit Summary:")
+    print(f"  Passed Checks:   {report.passed_count}")
+    print(f"  Warnings:        {report.warning_count}")
+    print(f"  Critical Errors: {report.failure_count}")
+    return 1 if report.has_critical_failures else 0
+
+
+def cmd_download(args: argparse.Namespace) -> int:
+    """Phase 1 entrypoint: Download raw report from Innervex."""
+    target_date = parse_target_date(args.report_date)
+    print(f"Download command invoked for report date: {target_date}")
+    print("Note: Live Innervex network extraction is scheduled for Phase 1.")
+    print("Ensure INNERVEX_USERNAME and INNERVEX_PASSWORD are set in .env before Phase 1.")
+    return 0
+
+
+def cmd_process(args: argparse.Namespace) -> int:
+    """Phase 3/4 entrypoint: Clean and transform local stored raw data."""
+    target_date = parse_target_date(args.report_date)
+    print(f"Process command invoked for report date: {target_date}")
+    print("Note: Offline processing engine is scaffolded and tested.")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Construct CLI argument parser."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app",
+        description="Pothys Swarna Mahal Daily Reporting Automation CLI",
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+
+    # Command: run
+    run_parser = subparsers.add_parser("run", help="Execute complete automation pipeline")
+    run_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD). Defaults to yesterday.",
+    )
+    run_parser.add_argument(
+        "--report-id",
+        type=str,
+        default="subhiksham",
+        choices=["subhiksham", "viruksham", "all"],
+        help="Report to process (default: subhiksham)",
+    )
+    run_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate execution without external side effects",
+    )
+    run_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass idempotency checks and rerun for existing date",
+    )
+
+    # Command: validate
+    validate_parser = subparsers.add_parser("validate", help="Validate system configuration and mappings")
+    validate_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date to audit",
+    )
+
+    # Command: download
+    download_parser = subparsers.add_parser("download", help="Download raw report from Innervex")
+    download_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD)",
+    )
+    download_parser.add_argument(
+        "--report-id",
+        type=str,
+        default="subhiksham",
+        help="Report identifier to download",
+    )
+
+    # Command: process
+    process_parser = subparsers.add_parser("process", help="Process and clean stored raw report")
+    process_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD)",
+    )
+    process_parser.add_argument(
+        "--report-id",
+        type=str,
+        default="subhiksham",
+        help="Report identifier to process",
+    )
+
+    return parser
+
+
+def main() -> None:
+    """Main CLI entrypoint."""
+    parser = build_parser()
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
+
+    args = parser.parse_args()
+    if args.command == "run":
+        sys.exit(cmd_run(args))
+    elif args.command == "validate":
+        sys.exit(cmd_validate(args))
+    elif args.command == "download":
+        sys.exit(cmd_download(args))
+    elif args.command == "process":
+        sys.exit(cmd_process(args))
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

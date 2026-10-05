@@ -1,0 +1,16 @@
+{
+  "run_id": "RUN-20261005-111149",
+  "started_at": "2026-10-05T11:11:49.824326",
+  "completed_at": "2026-10-05T11:11:49.825595",
+  "run_date": "2026-10-05",
+  "report_date": "2026-10-04",
+  "status": "SUCCESS",
+  "source": "Innervex:subhiksham",
+  "row_count": 0,
+  "processed_count": 0,
+  "error_count": 0,
+  "validation_status": "PENDING",
+  "execution_time_seconds": null,
+  "unresolved_employee_codes": [],
+  "notes": []
+}

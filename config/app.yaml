@@ -1,0 +1,41 @@
+# ==============================================================================
+# Pothys Swarna Mahal Daily Reporting Automation - Application Configuration
+# ==============================================================================
+
+app:
+  name: "pothys-reporting-automation"
+  version: "0.1.0"
+  timezone: "Asia/Kolkata"
+  environment: "development"  # development, staging, production
+
+storage:
+  data_dir: "data"
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  logs_dir: "logs"
+  temp_dir: "tmp"
+
+execution:
+  default_date_rule: "yesterday"  # yesterday or YYYY-MM-DD
+  idempotency_enabled: true
+  allow_partial_runs: false
+  max_retries: 3
+  retry_backoff_seconds: 5
+
+validation_policy:
+  halt_on_critical_failure: true
+  on_unresolved_employee_code: "FLAG_AND_CONTINUE"  # Options: FLAG_AND_CONTINUE, STRICT_HALT
+  on_duplicate_records: "FLAG_AND_DEDUPLICATE"      # Options: FLAG_AND_DEDUPLICATE, STRICT_HALT
+
+security:
+  redact_sensitive_logs: true
+  sensitive_keys:
+    - "password"
+    - "passwd"
+    - "secret"
+    - "token"
+    - "session_id"
+    - "jsessionid"
+    - "cookie"
+    - "authorization"
+    - "auth"

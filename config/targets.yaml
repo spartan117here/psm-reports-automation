@@ -1,0 +1,27 @@
+# ==============================================================================
+# Business Targets & Backlog Calculation Rules
+# Values are configuration-driven, never hardcoded in processing modules.
+# ==============================================================================
+
+targets:
+  fiscal_year: "2026-2027"
+
+  # Q2 Branch Targets (Observed historical reference - configurable)
+  q2:
+    TVL: 120000000
+    CPT: 216000000
+    TVM: 81000000
+    TPJ: 120000000
+    CBE: 90000000
+    SLM: 90000000
+    PNM: 60000000
+    PADI: 162000000
+
+  # H1 Multiplier relative to Q2 (approximately double, configurable)
+  h1_multiplier: 2.0
+
+  # Business calculation rule definitions
+  calculation_rules:
+    yet_to_achieve: "total_amount - target_amount"
+    achieved_percentage: "total_amount / target_amount * 100.0"
+    daily_average: "total_amount / day_of_month"

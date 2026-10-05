@@ -1,0 +1,111 @@
+# ==============================================================================
+# Report Configurations (Generic Adapter Architecture)
+# Both Subhiksham and Viruksham share the same schema & pipeline adapter.
+# ==============================================================================
+
+reports:
+  subhiksham:
+    report_id: "subhiksham"
+    display_name: "Scheme New Memberlist - New Swarna Subhiksham"
+    endpoint_key: "scheme_new_cust_rep"
+    innervex_action: "FindSchemeTransactionReport"
+    scheme_name: "NEW SWARNA SUBHIKSHAM"
+    # Exact 4 sub-schemes to be finalized in Phase 2
+    subschemes:
+      - "NEW SWARNA SUBHIKSHAM 1"
+      - "NEW SWARNA SUBHIKSHAM 2"
+      - "NEW SWARNA SUBHIKSHAM 3"
+      - "NEW SWARNA SUBHIKSHAM 4"
+    # Showroom filter: 31 showrooms (references mappings.yaml showroom list or 'ALL')
+    showroom_mode: "ALL_31"
+    emp_code_filter: "All"
+    promo_code_filter: "All"
+    export_mode: "EXPORT"
+    preamble_rows: 3
+    raw_expected_column_count: 21
+    # 11 Cleaned Output Columns in required business order
+    output_columns:
+      - "COSTNAME"
+      - "CLIENTID"
+      - "GROUPCODE"
+      - "MSNO"
+      - "NAME"
+      - "SCHDATE"
+      - "RECAMOUNT"
+      - "MOBILENO"
+      - "SCHEME"
+      - "COMMNAME"
+      - "COMMCODE"
+    # Discarded columns explicitly tracked for validation audit
+    discard_columns:
+      - "SNO"
+      - "DATEOFBIRTH"
+      - "ADDRESS"
+      - "PHONE"
+      - "EMPNAME"
+      - "EMPCODE"
+      - "IS TELECALLER"
+      - "IS HM"
+      - "PROMOCODE"
+      - "BRANCHNAME"
+    # Target Google Sheet monthly tab prefix (e.g. SS - Oct)
+    target_sheet_tab_prefix: "SS"
+    deduplication_key: "MSNO"
+
+  viruksham:
+    report_id: "viruksham"
+    display_name: "Scheme New Memberlist - Swarna Viruksham"
+    endpoint_key: "scheme_new_cust_rep"
+    innervex_action: "FindSchemeTransactionReport"
+    scheme_name: "SWARNA VIRUKSHAM"
+    # Exact 2 sub-schemes to be finalized in Phase 2
+    subschemes:
+      - "SWARNA VIRUKSHAM 1"
+      - "SWARNA VIRUKSHAM 2"
+    showroom_mode: "ALL_31"
+    emp_code_filter: "All"
+    promo_code_filter: "All"
+    export_mode: "EXPORT"
+    preamble_rows: 3
+    raw_expected_column_count: 21
+    output_columns:
+      - "COSTNAME"
+      - "CLIENTID"
+      - "GROUPCODE"
+      - "MSNO"
+      - "NAME"
+      - "SCHDATE"
+      - "RECAMOUNT"
+      - "MOBILENO"
+      - "SCHEME"
+      - "COMMNAME"
+      - "COMMCODE"
+    discard_columns:
+      - "SNO"
+      - "DATEOFBIRTH"
+      - "ADDRESS"
+      - "PHONE"
+      - "EMPNAME"
+      - "EMPCODE"
+      - "IS TELECALLER"
+      - "IS HM"
+      - "PROMOCODE"
+      - "BRANCHNAME"
+    # Target Google Sheet monthly tab prefix (e.g. SV - Oct)
+    target_sheet_tab_prefix: "SV"
+    deduplication_key: "MSNO"
+
+  closing:
+    report_id: "closing"
+    display_name: "Scheme Closing Report"
+    endpoint_key: "scheme_closing_rep"
+    innervex_action: "FindSchemeClosingReport"  # Subject to confirmation
+    scheme_name: "ALL_ACTIVE"                   # Subject to confirmation
+    status_options_count: 5                     # Subject to confirmation
+    showroom_mode: "ALL_31"
+    raw_expected_column_count: 15
+    cleaned_column_count: 7
+    # Note: Exact 7-column subset to be confirmed in Phase 7
+    output_columns: []
+    target_sheet_tab_prefix: "CLOSING"
+    deduplication_key: "REDEMNO"

@@ -1,0 +1,46 @@
+# ==============================================================================
+# Business Mappings & Attribution Rules
+# ==============================================================================
+
+# Employee code prefix or exact code to physical branch mapping
+# Examples observed in manual workflows; full list to be confirmed in Phase 4
+employee_to_branch:
+  TVC: "TRIVANDRUM"
+  TVL: "TIRUNELVELI"
+  CPT: "CHROMEPET"
+  KPM: "KANCHEEPURAM"
+  PAD: "PADI"
+  SLM: "SALEM"
+  PNM: "POONAMALLEE"
+  CBE: "COIMBATORE"
+  TRI: "TRICHY"
+  TPJ: "TRICHY"
+
+# Observed showroom codes (31 options in Innervex selector)
+# Placeholder codes - full 31 items to be verified in Phase 1 / Phase 2
+showroom_codes:
+  - "CPT"   # Chromepet
+  - "CBE"   # Coimbatore
+  - "KPM"   # Kancheepuram
+  - "PAD"   # Padi
+  - "PNM"   # Poonamallee
+  - "SLM"   # Salem
+  - "TVL"   # Tirunelveli
+  - "TPJ"   # Trichy
+  - "TVC"   # Trivandrum
+  - "TVM"   # Trivandrum alternate code
+  # Remaining 21 codes to be populated upon production verification
+
+# Special attribution rules
+special_locations:
+  online_label: "ONLINE"
+  corporate_office_label: "CORPORATE OFFICE"
+
+# Location label suffixes
+location_naming:
+  ss:
+    store_suffix: ""            # e.g., "CHROMEPET"
+    ecomm_suffix: " ECOMM"      # e.g., "CHROMEPET ECOMM"
+  sv:
+    store_suffix: " SV"         # e.g., "CHROMEPET SV"
+    ecomm_suffix: " SV ECOMM"   # e.g., "CHROMEPET SV ECOMM"
