@@ -61,8 +61,10 @@ logs/*.log
 logs/*.jsonl
 data/raw/*
 data/processed/*
+data/runs/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/runs/.gitkeep
 
 # Temporary / Scratch
 tmp/

@@ -10,12 +10,12 @@ reports:
     endpoint_key: "scheme_new_cust_rep"
     innervex_action: "FindSchemeTransactionReport"
     scheme_name: "NEW SWARNA SUBHIKSHAM"
-    # Exact 4 sub-schemes to be finalized in Phase 2
+    # Confirmed 4 sub-schemes from Innervex GetSubSchName
     subschemes:
-      - "NEW SWARNA SUBHIKSHAM 1"
-      - "NEW SWARNA SUBHIKSHAM 2"
-      - "NEW SWARNA SUBHIKSHAM 3"
-      - "NEW SWARNA SUBHIKSHAM 4"
+      - "NEW SWARNA SUBHIKSHAM"
+      - "SWARNALAKSHMI JEWELLERY PURCHASE PLAN W"
+      - "SWARNA SUBHIKSHAM FLEXI"
+      - "SWARNA LABHAM SUPER FLEXI"
     # Showroom filter: 31 showrooms (references mappings.yaml showroom list or 'ALL')
     showroom_mode: "ALL_31"
     emp_code_filter: "All"

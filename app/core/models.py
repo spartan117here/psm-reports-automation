@@ -137,6 +137,7 @@ class RawReportPayload(BaseModel):
     row_count: int
     data: List[Dict[str, Any]]
     raw_headers: List[str] = Field(default_factory=list)
+    raw_response: Optional[Dict[str, Any]] = None
 
 
 class CleanedRecord(BaseModel):

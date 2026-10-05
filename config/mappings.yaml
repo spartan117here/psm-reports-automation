@@ -16,20 +16,39 @@ employee_to_branch:
   TRI: "TRICHY"
   TPJ: "TRICHY"
 
-# Observed showroom codes (31 options in Innervex selector)
-# Placeholder codes - full 31 items to be verified in Phase 1 / Phase 2
+# Confirmed 31 showroom codes from Innervex defaultLoad
 showroom_codes:
-  - "CPT"   # Chromepet
-  - "CBE"   # Coimbatore
-  - "KPM"   # Kancheepuram
-  - "PAD"   # Padi
-  - "PNM"   # Poonamallee
-  - "SLM"   # Salem
-  - "TVL"   # Tirunelveli
-  - "TPJ"   # Trichy
-  - "TVC"   # Trivandrum
-  - "TVM"   # Trivandrum alternate code
-  # Remaining 21 codes to be populated upon production verification
+  - "APP"
+  - "CBE"
+  - "CPT"
+  - "DTH-CBE"
+  - "DTH-CPT"
+  - "DTH-KPM"
+  - "DTH-PAD"
+  - "DTH-PNM"
+  - "DTH-POR"
+  - "DTH-SLM"
+  - "DTH-TPJ"
+  - "DTH-TVC"
+  - "DTH-TVL"
+  - "ECOM"
+  - "EXP01"
+  - "EXP02"
+  - "HAPP"
+  - "HO-CONSIGN"
+  - "HO-REP"
+  - "KPM"
+  - "NGL"
+  - "PAD"
+  - "PNM"
+  - "POR"
+  - "SLM"
+  - "TEXBOT"
+  - "TEXCBE"
+  - "TEXMDU"
+  - "TPJ"
+  - "TVC"
+  - "TVL"
 
 # Special attribution rules
 special_locations:

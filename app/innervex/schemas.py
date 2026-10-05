@@ -2,7 +2,7 @@
 
 from datetime import date
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class InnervexReportRequestPayload(BaseModel):
@@ -37,6 +37,9 @@ class InnervexReportRequestPayload(BaseModel):
 class InnervexRawResponse(BaseModel):
     """Schema for validating JSON payload returned by Innervex endpoints."""
     data: List[Dict[str, Any]] = Field(default_factory=list, description="Array of report record dictionaries")
+    screenName: Optional[str] = None
     success: Optional[bool] = None
     message: Optional[str] = None
     total_records: Optional[int] = None
+
+    model_config = ConfigDict(extra="allow")

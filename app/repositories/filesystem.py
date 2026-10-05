@@ -33,25 +33,44 @@ class FileSystemReportRepository(ReportRepository):
 
     def save_raw_report(self, payload: RawReportPayload) -> Path:
         folder = self._get_partition_dir(self.raw_root, payload.report_date)
-        timestamp_str = datetime.now().strftime("%H%M%S")
-        filename = f"{payload.report_id}_{timestamp_str}.json"
-        target_path = folder / filename
+        date_str = payload.report_date.isoformat()
+        base_name = f"innervex_{payload.report_id}_memberlist_{date_str}.json"
+        target_path = folder / base_name
 
+        if target_path.exists():
+            timestamp_str = datetime.now().strftime("%H%M%S")
+            target_path = folder / f"innervex_{payload.report_id}_memberlist_{date_str}_{timestamp_str}.json"
+
+        # Preserve raw response structure exactly as received from Innervex
+        content = payload.raw_response if payload.raw_response is not None else payload.model_dump(mode="json")
         with open(target_path, "w", encoding="utf-8") as f:
-            json.dump(payload.model_dump(mode="json"), f, indent=2)
+            json.dump(content, f, indent=2)
 
         logger.info(f"Saved raw report ({payload.row_count} rows) to: {target_path}")
         return target_path
 
     def get_raw_report(self, report_id: str, report_date: date) -> Optional[RawReportPayload]:
         folder = self._get_partition_dir(self.raw_root, report_date)
-        matches = sorted(folder.glob(f"{report_id}_*.json"), reverse=True)
+        matches = sorted(
+            list(folder.glob(f"innervex_{report_id}_memberlist_*.json"))
+            + list(folder.glob(f"{report_id}_*.json")),
+            reverse=True,
+        )
         if not matches:
             return None
 
         # Return latest payload for the day
         with open(matches[0], "r", encoding="utf-8") as f:
             data = json.load(f)
+            if "data" in data and "report_id" not in data:
+                return RawReportPayload(
+                    report_id=report_id,
+                    report_date=report_date,
+                    row_count=len(data.get("data", [])),
+                    data=data.get("data", []),
+                    raw_headers=list(data["data"][0].keys()) if data.get("data") else [],
+                    raw_response=data,
+                )
             return RawReportPayload(**data)
 
     def save_cleaned_records(

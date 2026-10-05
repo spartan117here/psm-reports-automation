@@ -84,16 +84,43 @@ class InnervexClient:
                 details={"status_code": response.status_code, "body_snippet": response.text[:200]},
             )
 
+        # Validate non-empty body
+        if not response.text or not response.text.strip():
+            logger.error(f"Innervex returned an empty response body from {url}")
+            raise InnervexResponseError(
+                f"Innervex returned an empty response from {url}",
+                details={"status_code": response.status_code},
+            )
+
         try:
             json_data = response.json()
         except ValueError as e:
             logger.error(f"Failed to parse JSON response from {url}: {e}")
             raise InnervexResponseError(f"Response from {url} is not valid JSON: {e}") from e
 
-        if not isinstance(json_data, dict) or "data" not in json_data:
+        if not isinstance(json_data, dict):
+            raise InnervexResponseError(
+                f"Unexpected response structure from Innervex: expected JSON object.",
+                details={"received_type": type(json_data).__name__},
+            )
+
+        # Detect session expiration returned as JSON
+        if json_data.get("Message") == "Session Expired" or json_data.get("Success") is False:
+            err_msg = json_data.get("Message", "Session Expired or operation rejected")
+            logger.error(f"Innervex session invalid or expired: {err_msg}")
+            from app.core.exceptions import AuthenticationError
+            raise AuthenticationError(f"Innervex session expired or rejected: {err_msg}")
+
+        if "data" not in json_data:
             raise InnervexResponseError(
                 f"Unexpected response structure from Innervex: expected JSON dict with 'data' key.",
-                details={"keys_received": list(json_data.keys()) if isinstance(json_data, dict) else []},
+                details={"keys_received": list(json_data.keys())},
+            )
+
+        if not isinstance(json_data["data"], list):
+            raise InnervexResponseError(
+                f"Unexpected response structure from Innervex: 'data' field must be an array/list.",
+                details={"data_type": type(json_data["data"]).__name__},
             )
 
         return InnervexRawResponse(**json_data)

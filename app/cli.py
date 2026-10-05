@@ -147,12 +147,122 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_download(args: argparse.Namespace) -> int:
-    """Phase 1 entrypoint: Download raw report from Innervex."""
+    """Download one raw scheme memberlist report from Innervex."""
+    import logging
+    import requests
+    from app.core.exceptions import (
+        AuthenticationError,
+        InnervexConnectionError,
+        InnervexResponseError,
+    )
+    from app.innervex.auth import InnervexAuthenticator
+    from app.innervex.client import InnervexClient
+    from app.innervex.reports import SchemeReportFetcher
+    from app.repositories.filesystem import FileSystemReportRepository
+
+    # Keep console logger quiet during CLI output formatting
+    logging.getLogger("pothys_reporting").setLevel(logging.CRITICAL)
+
+    config_bundle = load_config()
     target_date = parse_target_date(args.report_date)
-    print(f"Download command invoked for report date: {target_date}")
-    print("Note: Live Innervex network extraction is scheduled for Phase 1.")
-    print("Ensure INNERVEX_USERNAME and INNERVEX_PASSWORD are set in .env before Phase 1.")
-    return 0
+    report_id = args.report_id or "subhiksham"
+
+    # 1. Validate configuration
+    if report_id not in config_bundle.reports.reports:
+        print(f"Error: Unknown report '{report_id}'")
+        return 1
+    report_cfg = config_bundle.get_report(report_id)
+
+    # 2. Check required configuration
+    missing_config = []
+    if not report_cfg.subschemes:
+        missing_config.append(f"Sub-schemes list for '{report_id}' in config/reports.yaml")
+    if not config_bundle.mappings.showroom_codes:
+        missing_config.append("Showroom codes list in config/mappings.yaml")
+
+    if missing_config:
+        print("Error: Missing required configuration values:")
+        for item in missing_config:
+            print(f"  - {item}")
+        return 1
+
+    # 3. Authenticate using InnervexAuthenticator
+    session = requests.Session()
+    session.headers.update(config_bundle.innervex.default_headers)
+    authenticator = InnervexAuthenticator(config_bundle.innervex)
+
+    try:
+        auth_res = authenticator.login(session=session)
+        if not auth_res.authenticated:
+            print("Authentication failed: Unable to establish session")
+            return 1
+
+        # 4. Use the same authenticated session to fetch the report
+        client = InnervexClient(config_bundle.innervex, auth_strategy=authenticator)
+        client.session = session
+        fetcher = SchemeReportFetcher(client)
+
+        payload = fetcher.fetch_report(
+            config=report_cfg,
+            report_date=target_date,
+            showroom_codes=config_bundle.mappings.showroom_codes,
+        )
+
+        # 5. Save raw response
+        data_dir = config_bundle.project_root / config_bundle.app.storage.data_dir
+        repo = FileSystemReportRepository(data_dir)
+        saved_path = repo.save_raw_report(payload)
+
+        try:
+            rel_path = saved_path.relative_to(config_bundle.project_root)
+        except ValueError:
+            rel_path = saved_path
+
+        report_title = "Subhiksham" if report_id == "subhiksham" else report_cfg.display_name
+
+        print("Innervex Scheme Memberlist Download")
+        print("-----------------------------------")
+        print(f"Report: {report_title}")
+        print(f"Report date: {target_date.isoformat()}")
+        print("HTTP status: 200")
+        print("Response format: JSON")
+        print(f"Records received: {payload.row_count}")
+        print(f"Raw response saved: {str(rel_path).replace(chr(92), '/')}")
+        print("Status: SUCCESS")
+        return 0
+
+    except AuthenticationError as e:
+        print("Innervex Scheme Memberlist Download")
+        print("-----------------------------------")
+        print(f"Report: {report_id}")
+        print(f"Report date: {target_date.isoformat()}")
+        print("Status: FAILED")
+        print(f"Authentication Error: {e.message}")
+        return 1
+    except InnervexConnectionError as e:
+        print("Innervex Scheme Memberlist Download")
+        print("-----------------------------------")
+        print(f"Report: {report_id}")
+        print(f"Report date: {target_date.isoformat()}")
+        print("Status: FAILED")
+        print(f"Connection Error: {e.message}")
+        return 1
+    except InnervexResponseError as e:
+        print("Innervex Scheme Memberlist Download")
+        print("-----------------------------------")
+        print(f"Report: {report_id}")
+        print(f"Report date: {target_date.isoformat()}")
+        print("Status: FAILED")
+        print(f"Response Error: {e.message}")
+        return 1
+    except Exception as e:
+        print("Innervex Scheme Memberlist Download")
+        print("-----------------------------------")
+        print(f"Report: {report_id}")
+        print(f"Report date: {target_date.isoformat()}")
+        print("Status: FAILED")
+        print(f"Unexpected Error: {type(e).__name__}: {e}")
+        return 1
 
 
 def cmd_process(args: argparse.Namespace) -> int:

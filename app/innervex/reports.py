@@ -31,11 +31,25 @@ class SchemeReportFetcher:
         """
         date_str = report_date.strftime("%Y-%m-%d")
 
-        # In Innervex, showroom parameter can be 'ALL' or comma-separated showroom codes
-        showroom_param = ",".join(showroom_codes) if showroom_codes else "ALL"
+        # In Innervex, multi-select parameters are formatted as comma-separated single-quoted strings:
+        # e.g., "'CPT','PAD','TVL'"
+        if showroom_codes:
+            quoted_showrooms = [
+                s if (s.startswith("'") and s.endswith("'")) else f"'{s}'"
+                for s in showroom_codes
+            ]
+            showroom_param = ",".join(quoted_showrooms)
+        else:
+            showroom_param = "ALL"
 
-        # Comma-separate subschemes if multiple configured
-        subscheme_param = ",".join(config.subschemes) if config.subschemes else None
+        if config.subschemes:
+            quoted_subschemes = [
+                s if (s.startswith("'") and s.endswith("'")) else f"'{s}'"
+                for s in config.subschemes
+            ]
+            subscheme_param = ",".join(quoted_subschemes)
+        else:
+            subscheme_param = "ALL"
 
         return InnervexReportRequestPayload(
             Action=config.innervex_action,
@@ -79,4 +93,5 @@ class SchemeReportFetcher:
             row_count=len(response.data),
             data=response.data,
             raw_headers=headers,
+            raw_response=response.model_dump(),
         )
