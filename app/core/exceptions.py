@@ -52,5 +52,9 @@ class GoogleSheetsError(ReportingAutomationError):
     """Raised when interaction with Google Sheets API fails."""
 
 
+class GoogleAuthenticationError(GoogleSheetsError, AuthenticationError):
+    """Raised when authentication against Google APIs fails."""
+
+
 class DeliveryError(ReportingAutomationError):
     """Raised when report delivery to recipients fails."""

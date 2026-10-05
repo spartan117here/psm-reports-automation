@@ -3,6 +3,8 @@
 import argparse
 from datetime import date, datetime, timedelta
 import logging
+import os
+from pathlib import Path
 import sys
 from typing import Optional
 
@@ -390,6 +392,160 @@ def cmd_auth_test(args: argparse.Namespace) -> int:
         return 1
 
 
+def _print_discovery_report(report: dict) -> None:
+    """Safely print structured workbook discovery report."""
+    print(f"\nSpreadsheet Title:     {report.get('spreadsheet_title', 'Unknown')}")
+    print(f"Spreadsheet ID:        {report.get('redacted_spreadsheet_id', 'Unknown')}")
+    print(f"Total Worksheets:      {report.get('total_sheets', 0)}")
+
+    all_tabs = report.get("all_tabs", [])
+    if all_tabs:
+        print("\nDiscovered Worksheets:")
+        print("-" * 55)
+        print(f"{'Sheet Title':<30} | {'Rows':<8} | {'Cols':<6}")
+        print("-" * 55)
+        for t in all_tabs:
+            print(f"{t.get('title', ''):<30} | {t.get('row_count', 0):<8} | {t.get('column_count', 0):<6}")
+        print("-" * 55)
+
+    ss_insp = report.get("subhiksham_inspection", {})
+    if ss_insp:
+        print(f"\nSubhiksham Sheet Inspection ({ss_insp.get('tab_name')}):")
+        print(f"  Detected Columns:    {ss_insp.get('detected_column_count', 0)}")
+        print(f"  Estimated Rows:      {ss_insp.get('estimated_data_row_count', 0)}")
+        print(f"  Headers:             {', '.join(ss_insp.get('headers', []))}")
+        formulas = ss_insp.get("sample_formulas", {})
+        if formulas:
+            print(f"  Sample Formulas:     {formulas}")
+        else:
+            print("  Sample Formulas:     None detected in sample rows (static values)")
+
+    mapping_analysis = report.get("column_mapping_analysis", {})
+    if mapping_analysis:
+        print("\nCleaned 11-Column to Sheet 14-Column Mapping Analysis:")
+        print("-" * 80)
+        print(f"{'Col':<5} | {'Sheet Header':<16} | {'Source Field':<22} | {'Transformation':<30}")
+        print("-" * 80)
+        for m in mapping_analysis.get("mappings", []):
+            print(f"{m.get('column_letter'):<5} | {m.get('sheet_column_name'):<16} | {m.get('source_field'):<22} | {m.get('transformation'):<30}")
+        print("-" * 80)
+
+    oct_status = report.get("october_data_status", {})
+    if oct_status:
+        print("\nOctober Data Status:")
+        print(f"  October Tab Present: {oct_status.get('has_october_tab')}")
+        print(f"  Status:              {oct_status.get('status')}")
+
+
+def cmd_sheets_discover(args: argparse.Namespace) -> int:
+    """Read-only discovery of Google Sheets workbook structure and metadata."""
+    import logging
+    from app.core.exceptions import GoogleAuthenticationError, GoogleSheetsError
+    from app.google_sheets.client import GoogleApiSheetsService, MockGoogleSheetsService
+    from app.google_sheets.discovery import SheetDiscoveryEngine, EXPECTED_MONTHLY_COLUMNS
+
+    logging.getLogger("pothys_reporting").setLevel(logging.CRITICAL)
+
+    # Ensure .env is loaded
+    load_config()
+
+    print("Google Sheets Read-Only Discovery")
+    print("=================================")
+
+    # 1. Resolve spreadsheet ID
+    spreadsheet_id = (
+        getattr(args, "spreadsheet_id", None)
+        or os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID")
+    )
+
+    # 2. Resolve credentials configuration
+    sa_path = (
+        getattr(args, "service_account", None)
+        or os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH")
+        or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    )
+    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+    if getattr(args, "mock", False):
+        print("Status: MOCK_MODE (Simulated offline discovery)")
+        mock_meta = {
+            "properties": {"title": "New Enrollment from April 2026"},
+            "sheets": [
+                {"properties": {"title": "Employees", "sheetId": 101, "gridProperties": {"rowCount": 150, "columnCount": 10}}},
+                {"properties": {"title": "SS - Aug", "sheetId": 102, "gridProperties": {"rowCount": 520, "columnCount": 14}}},
+                {"properties": {"title": "SV - Aug", "sheetId": 103, "gridProperties": {"rowCount": 210, "columnCount": 14}}},
+                {"properties": {"title": "Consolidate Report - Aug", "sheetId": 104, "gridProperties": {"rowCount": 45, "columnCount": 20}}},
+                {"properties": {"title": "SS - Sept", "sheetId": 105, "gridProperties": {"rowCount": 612, "columnCount": 14}}},
+                {"properties": {"title": "SV - Sept", "sheetId": 106, "gridProperties": {"rowCount": 240, "columnCount": 14}}},
+                {"properties": {"title": "Consolidate Report - Sept", "sheetId": 107, "gridProperties": {"rowCount": 45, "columnCount": 20}}},
+            ],
+        }
+        sid = "MOCK_SPREADSHEET_ID"
+        mock_service = MockGoogleSheetsService(mock_meta)
+        mock_service.sheets[f"{sid}:SS - Sept!A1:Z1"] = [EXPECTED_MONTHLY_COLUMNS]
+        mock_service.sheets[f"{sid}:SS - Sept!D:D"] = [["MSNO"]] + [["MSNO-001"]] * 611
+        mock_service.sheets[f"{sid}:Employees!A1:Z1"] = [["EMPCODE", "EMPNAME", "BRANCH", "LOCATION"]]
+        mock_service.sheets[f"{sid}:Employees!A:A"] = [["EMPCODE"]] + [["1001"]] * 50
+        mock_service.formulas[f"{sid}:SS - Sept!A1:Z10"] = [
+            [],
+            ["", "", "", "", "", "", "", "", "", "", "", "", "", '=M2&" - "&L2']
+        ]
+        engine = SheetDiscoveryEngine(mock_service)
+        report = engine.inspect_workbook(sid)
+        _print_discovery_report(report)
+        print("\nWrite operation performed: NO")
+        print("Status: SUCCESS (Mock)")
+        return 0
+
+    missing_items = []
+    if not sa_path and not sa_json:
+        missing_items.append("Google Service Account Key: GOOGLE_SERVICE_ACCOUNT_PATH or GOOGLE_APPLICATION_CREDENTIALS not set")
+    elif sa_path and not Path(sa_path).is_file():
+        missing_items.append(f"Google Service Account file not found at: '{sa_path}'")
+
+    if not spreadsheet_id:
+        missing_items.append("Spreadsheet ID: GOOGLE_SHEET_NEW_ENROLLMENT_ID not set in .env (or pass --spreadsheet-id)")
+
+    if missing_items:
+        print("Status: CONFIGURATION_MISSING")
+        print("\nIdentified Missing Configuration:")
+        for item in missing_items:
+            print(f"  - {item}")
+        print("\nAuthentication Mechanism Expected:")
+        print("  - Google Cloud Service Account JSON keyfile")
+        print("  - API Scope: https://www.googleapis.com/auth/spreadsheets.readonly (Read-Only)")
+        print("\nSetup Procedure:")
+        print("  1. Place the Service Account JSON keyfile in secrets/ (e.g. secrets/service_account.json).")
+        print("  2. Add GOOGLE_SERVICE_ACCOUNT_PATH=secrets/service_account.json to .env")
+        print("  3. Add GOOGLE_SHEET_NEW_ENROLLMENT_ID=<spreadsheet-id> to .env")
+        print("  4. Grant the Service Account email 'Viewer' access to the Google Spreadsheet.")
+        print("  5. Run 'python -m app sheets-discover' to inspect live sheets.")
+        print("  (Note: Use 'python -m app sheets-discover --mock' to run simulated offline discovery)")
+        return 1
+
+    try:
+        service = GoogleApiSheetsService(
+            service_account_path=sa_path,
+            service_account_json=sa_json,
+            read_only=True,
+        )
+        engine = SheetDiscoveryEngine(service)
+        report = engine.inspect_workbook(spreadsheet_id)
+        _print_discovery_report(report)
+        print("\nWrite operation performed: NO")
+        print("Status: SUCCESS")
+        return 0
+    except GoogleAuthenticationError as e:
+        print(f"Status: AUTHENTICATION_FAILED\nError: {e.message}")
+        return 1
+    except GoogleSheetsError as e:
+        print(f"Status: DISCOVERY_FAILED\nError: {e.message}")
+        return 1
+    except Exception as e:
+        print(f"Status: ERROR\nUnexpected Error: {type(e).__name__}: {e}")
+        return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -469,6 +625,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Report identifier to process",
     )
 
+    # Command: sheets-discover
+    sheets_parser = subparsers.add_parser(
+        "sheets-discover",
+        help="Read-only discovery of Google Sheets workbook structure and metadata",
+    )
+    sheets_parser.add_argument(
+        "--spreadsheet-id",
+        type=str,
+        default=None,
+        help="Target Google Spreadsheet ID (overrides GOOGLE_SHEET_NEW_ENROLLMENT_ID)",
+    )
+    sheets_parser.add_argument(
+        "--service-account",
+        type=str,
+        default=None,
+        help="Path to Google Service Account JSON (overrides GOOGLE_SERVICE_ACCOUNT_PATH)",
+    )
+    sheets_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Simulate discovery using reference workbook schema for offline verification",
+    )
+
     return parser
 
 
@@ -490,6 +669,8 @@ def main() -> None:
         sys.exit(cmd_download(args))
     elif args.command == "process":
         sys.exit(cmd_process(args))
+    elif args.command == "sheets-discover":
+        sys.exit(cmd_sheets_discover(args))
     else:
         parser.print_help()
         sys.exit(1)
