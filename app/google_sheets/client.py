@@ -62,6 +62,11 @@ class GoogleSheetsService(ABC):
         """Fetch all existing non-empty values from a column for idempotency deduplication."""
         pass
 
+    @abstractmethod
+    def ensure_grid_capacity(self, spreadsheet_id: str, tab_name: str, required_rows: int) -> None:
+        """Ensure worksheet grid dimension has at least required_rows capacity."""
+        pass
+
 
 class MockGoogleSheetsService(GoogleSheetsService):
     """In-memory mock service for testing and offline execution."""
@@ -114,6 +119,9 @@ class MockGoogleSheetsService(GoogleSheetsService):
             if r and str(r[0]).strip():
                 values.add(str(r[0]).strip())
         return values
+
+    def ensure_grid_capacity(self, spreadsheet_id: str, tab_name: str, required_rows: int) -> None:
+        pass
 
 
 class GoogleApiSheetsService(GoogleSheetsService):
@@ -287,3 +295,42 @@ class GoogleApiSheetsService(GoogleSheetsService):
             if r and str(r[0]).strip():
                 values.add(str(r[0]).strip())
         return values
+
+    def ensure_grid_capacity(self, spreadsheet_id: str, tab_name: str, required_rows: int) -> None:
+        """Ensure worksheet grid dimension has at least required_rows capacity."""
+        if self.read_only:
+            return
+        meta = self.get_spreadsheet_metadata(spreadsheet_id)
+        sheet_meta = None
+        for s in meta.get("sheets", []):
+            if s.get("properties", {}).get("title") == tab_name:
+                sheet_meta = s.get("properties", {})
+                break
+        if not sheet_meta:
+            return
+        current_rows = sheet_meta.get("gridProperties", {}).get("rowCount", 0)
+        if current_rows < required_rows:
+            rows_to_add = required_rows - current_rows
+            sheet_id = sheet_meta.get("sheetId")
+            body = {
+                "requests": [
+                    {
+                        "appendDimension": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "length": rows_to_add,
+                        }
+                    }
+                ]
+            }
+            try:
+                self.service.spreadsheets().batchUpdate(
+                    spreadsheetId=spreadsheet_id, body=body
+                ).execute()
+                logger.info(
+                    f"Expanded grid capacity for '{tab_name}' from {current_rows} to {required_rows} rows."
+                )
+            except Exception as e:
+                raise GoogleSheetsError(
+                    f"Failed to expand grid rows for '{tab_name}' in spreadsheet '{spreadsheet_id}': {e}"
+                ) from e

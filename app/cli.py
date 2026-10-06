@@ -46,11 +46,44 @@ def parse_target_date(date_str: Optional[str]) -> date:
     return date.today() - timedelta(days=1)
 
 
+def _set_stage(logger: logging.Logger, stage: str) -> None:
+    """Update active pipeline stage in logger context filters."""
+    from app.core.logging import RunContextFilter
+
+    for f in getattr(logger, "filters", []):
+        if isinstance(f, RunContextFilter):
+            f.stage = stage
+    for h in getattr(logger, "handlers", []):
+        for f in getattr(h, "filters", []):
+            if isinstance(f, RunContextFilter):
+                f.stage = stage
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     """Execute the full reporting automation pipeline."""
+    import requests
+    from app.core.exceptions import (
+        AuthenticationError,
+        CriticalValidationError,
+        InnervexConnectionError,
+        InnervexResponseError,
+        TransformationError,
+    )
+    from app.google_sheets.client import MockGoogleSheetsService
+    from app.google_sheets.writer import SheetWriter
+    from app.innervex.auth import InnervexAuthenticator
+    from app.innervex.client import InnervexClient
+    from app.innervex.reports import SchemeReportFetcher
+    from app.processing.aggregators import LocationAggregator
+    from app.processing.reconciliation import DataReconciler
+
+    # 1. Resolve target report date
     target_date = parse_target_date(args.report_date)
     today = date.today()
+
+    # 2. Resolve run ID
     run_id = generate_run_id(today)
+    report_id = args.report_id or "subhiksham"
 
     config_bundle = load_config()
     logs_dir = config_bundle.project_root / config_bundle.app.storage.logs_dir
@@ -69,11 +102,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     run_repo = FileSystemRunRepository(data_dir)
     report_repo = FileSystemReportRepository(data_dir)
 
-    # 1. Idempotency Check
+    # 3. Perform idempotency check
     if config_bundle.app.execution.idempotency_enabled and not args.force:
-        if run_repo.is_already_processed(target_date, args.report_id):
+        if run_repo.is_already_processed(target_date, report_id):
             logger.warning(
-                f"Report for date {target_date} ({args.report_id}) was already successfully processed. "
+                f"Report for date {target_date} ({report_id}) was already successfully processed. "
                 "Skipping run to maintain idempotency. Use --force to override."
             )
             return 0
@@ -82,40 +115,367 @@ def cmd_run(args: argparse.Namespace) -> int:
         run_id=run_id,
         run_date=today,
         report_date=target_date,
-        source=f"Innervex:{args.report_id}",
+        source=f"Innervex:{report_id}",
         status=RunStatus.IN_PROGRESS,
     )
     run_repo.save_run(run_meta)
 
-    # In Phase 0, we validate configuration, test models, and demonstrate dry-run capabilities
-    logger.info("[PHASE 0 SKELETON] Validating configuration and pipeline readiness...")
+    # 4. Validate configuration
+    _set_stage(logger, "VALIDATION")
+    if report_id not in config_bundle.reports.reports:
+        logger.error(f"Unknown report '{report_id}'. Configured reports: {list(config_bundle.reports.reports.keys())}")
+        run_meta.status = RunStatus.FAILED
+        run_meta.completed_at = datetime.now()
+        run_repo.save_run(run_meta)
+        return 1
+
+    report_cfg = config_bundle.get_report(report_id)
+
+    missing_config = []
+    if not report_cfg.subschemes:
+        missing_config.append(f"Sub-schemes list for '{report_id}' in config/reports.yaml")
+    if not config_bundle.mappings.showroom_codes:
+        missing_config.append("Showroom codes list in config/mappings.yaml")
+
+    if missing_config:
+        for item in missing_config:
+            logger.error(f"Missing required configuration: {item}")
+        run_meta.status = RunStatus.FAILED
+        run_meta.completed_at = datetime.now()
+        run_repo.save_run(run_meta)
+        return 1
+
     val_engine = ValidationEngine(
         halt_on_critical=config_bundle.app.validation_policy.halt_on_critical_failure
     )
-
-    # Perform pre-flight target check
     val_res = ValidationRules.check_targets_sanity(config_bundle.targets.q2)
-    report = val_engine.create_report(run_id, [val_res])
+    val_engine.create_report(run_id, [val_res])
 
-    logger.info(
-        f"Pipeline validation passed. Active reports configured: {list(config_bundle.reports.reports.keys())}"
-    )
+    try:
+        # 5. Authenticate with Innervex
+        _set_stage(logger, "AUTH")
+        logger.info(f"Authenticating with Innervex at {config_bundle.innervex.base_url}...")
+        session = requests.Session()
+        session.headers.update(config_bundle.innervex.default_headers)
+        authenticator = InnervexAuthenticator(config_bundle.innervex)
+        auth_res = authenticator.login(session=session)
+        if not auth_res.authenticated:
+            logger.error("Authentication failed: Unable to establish session with Innervex.")
+            run_meta.status = RunStatus.FAILED
+            run_meta.completed_at = datetime.now()
+            run_repo.save_run(run_meta)
+            return 1
+        logger.info("Innervex authentication established successfully.")
 
-    if args.dry_run:
-        logger.info("[DRY RUN] Dry run completed successfully without external network calls.")
+        # 6. Fetch the configured report
+        _set_stage(logger, "DOWNLOAD")
+        logger.info(f"Fetching report '{report_cfg.display_name}' for date {target_date}...")
+        client = InnervexClient(config_bundle.innervex, auth_strategy=authenticator)
+        client.session = session
+        fetcher = SchemeReportFetcher(client)
+        raw_payload = fetcher.fetch_report(
+            config=report_cfg,
+            report_date=target_date,
+            showroom_codes=config_bundle.mappings.showroom_codes,
+        )
+        run_meta.row_count = raw_payload.row_count
+        logger.info(f"Received {raw_payload.row_count} records from Innervex.")
+
+        # 7. Save raw JSON
+        raw_saved_path = report_repo.save_raw_report(raw_payload)
+        logger.info(f"Raw report successfully saved to: {raw_saved_path}")
+
+        # 8. Clean and validate the raw report
+        _set_stage(logger, "CLEANING")
+        v_non_empty = ValidationRules.check_non_empty_response(raw_payload)
+        v_headers = ValidationRules.check_required_headers(
+            raw_payload.raw_headers, report_cfg.output_columns
+        )
+        val_engine.create_report(run_id, [v_non_empty, v_headers])
+
+        cleaner = SchemeReportCleaner(report_cfg)
+        cleaning_result = cleaner.clean_and_validate(raw_payload.data, report_date=target_date)
+        cleaned_records = cleaning_result.records
+        run_meta.processed_count = cleaning_result.cleaned_count
+        run_meta.error_count = cleaning_result.invalid_count
+        logger.info(
+            f"Cleaning complete: {cleaning_result.cleaned_count} valid records, "
+            f"{cleaning_result.invalid_count} invalid."
+        )
+
+        # 9. Save canonical cleaned CSV/JSON
+        cleaned_csv_path = report_repo.save_cleaned_records(report_id, target_date, cleaned_records)
+        logger.info(f"Cleaned dataset saved: CSV: {cleaned_csv_path}")
+
+        # 10. Reconcile raw vs cleaned (record count & RECAMOUNT total)
+        _set_stage(logger, "RECONCILIATION")
+        rec_result = DataReconciler.reconcile_raw_vs_cleaned(raw_payload, cleaned_records)
+        v_rec = ValidationRules.check_reconciliation(
+            source_count=rec_result.source_row_count,
+            cleaned_count=rec_result.processed_row_count,
+            source_amount=rec_result.source_amount_total,
+            cleaned_amount=rec_result.processed_amount_total,
+        )
+        val_engine.create_report(run_id, [v_rec])
+        if not rec_result.is_matched:
+            logger.error(f"Reconciliation failure: {rec_result.message}")
+            run_meta.status = RunStatus.FAILED
+            run_meta.completed_at = datetime.now()
+            run_repo.save_run(run_meta)
+            return 1
+        logger.info(
+            f"Reconciliation successful: Raw {rec_result.source_row_count} rows "
+            f"(INR {rec_result.source_amount_total:,.2f}) == Cleaned {rec_result.processed_row_count} rows "
+            f"(INR {rec_result.processed_amount_total:,.2f})"
+        )
+
+        # 11. Enrich records using the EXISTING LocationResolver
+        _set_stage(logger, "TRANSFORMATION")
+        resolver = LocationResolver(config_bundle.mappings)
+        scheme_type = "ss" if report_id == "subhiksham" else "sv"
+        transformer = RecordTransformer(resolver)
+        enriched_records = transformer.enrich_records(cleaned_records, scheme_type=scheme_type)
+        unresolved_codes = resolver.get_all_unresolved_codes()
+        run_meta.unresolved_employee_codes = unresolved_codes
+
+        # 12. Transform records into existing A:N sheet-row structure
+        sheet_rows = [RecordTransformer.to_sheet_row_values(r) for r in enriched_records]
+        logger.info(f"Transformed {len(sheet_rows)} records into 14-column layout (A through N).")
+
+        # 13. Run existing validation checks
+        _set_stage(logger, "VALIDATION")
+        v_dupes = ValidationRules.check_duplicate_msno(cleaned_records)
+        v_amount = ValidationRules.check_amount_sanity(cleaned_records)
+        v_unresolved = ValidationRules.check_unresolved_employee_codes(unresolved_codes)
+        val_engine.create_report(run_id, [v_dupes, v_amount, v_unresolved])
+
+        # 14. Calculate existing store-level aggregation using LocationAggregator
+        _set_stage(logger, "AGGREGATION")
+        aggregator = LocationAggregator(config_bundle.targets)
+        location_metrics = aggregator.aggregate_by_location(
+            records=enriched_records,
+            target_branch_map=config_bundle.targets.q2,
+            day_of_month=target_date.day,
+        )
+        logger.info(f"Calculated store aggregations across {len(location_metrics)} locations.")
+
+        # Target monthly sheet tab name dynamically derived (e.g. 'SS - Oct' or 'SV - Oct')
+        from app.google_sheets.reconciliation import derive_monthly_tab_name
+        target_tab = derive_monthly_tab_name(report_cfg.target_sheet_tab_prefix, target_date)
+
+        # 15. In --dry-run mode
+        if args.dry_run:
+            _set_stage(logger, "DRY_RUN")
+
+            sa_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+            spreadsheet_id = os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID")
+
+            live_service_available = bool((sa_path or sa_json) and spreadsheet_id)
+            if live_service_available and sa_path and not Path(sa_path).is_file() and not sa_json:
+                live_service_available = False
+
+            reconcile_res = None
+            if live_service_available:
+                try:
+                    from app.google_sheets.client import GoogleApiSheetsService
+                    from app.google_sheets.reconciliation import LiveSheetReconciler
+                    sheets_service = GoogleApiSheetsService(
+                        service_account_path=sa_path,
+                        service_account_json=sa_json,
+                        read_only=True,
+                    )
+                    reconciler = LiveSheetReconciler(sheets_service)
+                    reconcile_res = reconciler.reconcile_records(
+                        spreadsheet_id=spreadsheet_id,
+                        target_tab=target_tab,
+                        report_date=target_date,
+                        records=cleaning_result.records,
+                    )
+                except Exception as e:
+                    logger.warning(f"Could not connect to live Google Sheet for dry-run reconciliation: {e}")
+                    reconcile_res = None
+
+            if reconcile_res is not None and not reconcile_res.status.startswith("FAILED"):
+                writer = SheetWriter(sheets_service)
+                append_result = writer.append_new_records(
+                    spreadsheet_id=spreadsheet_id,
+                    tab_name=target_tab,
+                    reconciliation_result=reconcile_res,
+                    records=cleaning_result.records,
+                    dry_run=True,
+                )
+                would_append = reconcile_res.new_record_count
+                would_skip = reconcile_res.already_present_count
+                conflicts = reconcile_res.conflict_count
+                tab_mode = f"{target_tab} (Live Read-Only Reconciliation)"
+            else:
+                mock_service = MockGoogleSheetsService()
+                writer = SheetWriter(mock_service)
+                append_result = writer.append_rows_idempotently(
+                    spreadsheet_id="DRY_RUN_MOCK_SPREADSHEET",
+                    tab_name=target_tab,
+                    rows=sheet_rows,
+                    key_column_index=3,
+                )
+                would_append = append_result.appended_count
+                would_skip = append_result.skipped_duplicates_count
+                conflicts = cleaning_result.duplicate_msno_affected_count + cleaning_result.invalid_count
+                tab_mode = f"{target_tab} (Mock Simulation)"
+
+            # Produce clear summary
+            print("\n" + "=" * 70)
+            print("POTHYS REPORTING AUTOMATION -- PIPELINE DRY RUN SUMMARY")
+            print("=" * 70)
+            print(f"Report:                     {report_cfg.display_name}")
+            print(f"Report Date:                {target_date.isoformat()}")
+            print(f"Run ID:                     {run_id}")
+            print("Pipeline Mode:              DRY RUN (Simulation)")
+            print("-" * 70)
+            print(f"Downloaded records:         {raw_payload.row_count}")
+            print(f"Cleaned records:            {cleaning_result.cleaned_count}")
+            print(f"Invalid records:            {cleaning_result.invalid_count}")
+            print(f"Duplicate MSNO count:       {cleaning_result.duplicate_msno_count}")
+            print(f"Enriched records (A-N):     {len(enriched_records)}")
+            print(f"Total RECAMOUNT:            INR {cleaning_result.total_recamount:,.2f}")
+            print("-" * 70)
+            print(f"Target Sheet Tab:           {tab_mode}")
+            print(f"Incoming records:           {cleaning_result.cleaned_count}")
+            print(f"Already present:            {would_skip}")
+            print(f"New:                        {would_append}")
+            print(f"Conflicts:                  {conflicts}")
+            print(f"Would write:                {would_append}")
+            print("Actual writes:              0")
+            print("Live Google Sheets writes:   0")
+            print("-" * 70)
+            print(f"Cleaned CSV saved:          {cleaned_csv_path}")
+            print(f"Raw JSON saved:             {raw_saved_path}")
+            print("Status:                     DRY_RUN SUCCESS")
+            print("=" * 70 + "\n")
+
+            run_meta.status = RunStatus.DRY_RUN
+            run_meta.completed_at = datetime.now()
+            run_meta.execution_time_seconds = (run_meta.completed_at - run_meta.started_at).total_seconds()
+            run_meta.validation_status = "PASSED"
+            run_meta.notes.append("[DRY RUN] Simulation executed without external Google Sheets writes.")
+            run_repo.save_run(run_meta)
+            logger.info("[DRY RUN] Dry run completed successfully with 0 live writes.")
+            return 0
+
+        # 16. In live mode: Authenticate and perform safe reconciliation and append
+        _set_stage(logger, "SHEETS_UPDATE")
+        sa_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        spreadsheet_id = os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID")
+
+        if not ((sa_path or sa_json) and spreadsheet_id):
+            logger.error(
+                "Google Sheets credentials not configured (GOOGLE_SERVICE_ACCOUNT_PATH / "
+                "GOOGLE_SHEET_NEW_ENROLLMENT_ID). Cannot perform live sheet append."
+            )
+            run_meta.status = RunStatus.FAILED
+            run_meta.completed_at = datetime.now()
+            run_repo.save_run(run_meta)
+            return 1
+
+        from app.google_sheets.client import GoogleApiSheetsService
+        from app.google_sheets.reconciliation import LiveSheetReconciler
+        sheets_service = GoogleApiSheetsService(
+            service_account_path=sa_path,
+            service_account_json=sa_json,
+            read_only=False,
+        )
+
+        reconciler = LiveSheetReconciler(sheets_service)
+        reconcile_res = reconciler.reconcile_records(
+            spreadsheet_id=spreadsheet_id,
+            target_tab=target_tab,
+            report_date=target_date,
+            records=cleaning_result.records,
+        )
+
+        if reconcile_res.status.startswith("FAILED"):
+            logger.error(f"Live reconciliation failed: {reconcile_res.error_message}")
+            run_meta.status = RunStatus.FAILED
+            run_meta.completed_at = datetime.now()
+            run_repo.save_run(run_meta)
+            return 1
+
+        if reconcile_res.conflict_count > 0:
+            logger.error(
+                f"Live reconciliation detected {reconcile_res.conflict_count} conflict(s). "
+                "Failing closed to prevent corrupted writes."
+            )
+            run_meta.status = RunStatus.FAILED
+            run_meta.completed_at = datetime.now()
+            run_repo.save_run(run_meta)
+            return 1
+
+        writer = SheetWriter(sheets_service)
+        append_res = writer.append_new_records(
+            spreadsheet_id=spreadsheet_id,
+            tab_name=target_tab,
+            reconciliation_result=reconcile_res,
+            records=enriched_records,
+            dry_run=False,
+            verify_after_write=True,
+        )
+
+        print("\n" + "=" * 70)
+        print("POTHYS REPORTING AUTOMATION -- PIPELINE EXECUTION SUMMARY")
+        print("=" * 70)
+        print(f"Report:                     {report_cfg.display_name}")
+        print(f"Report Date:                {target_date.isoformat()}")
+        print(f"Run ID:                     {run_id}")
+        print(f"Downloaded records:         {raw_payload.row_count}")
+        print(f"Cleaned records:            {cleaning_result.cleaned_count}")
+        print(f"Enriched records (A-N):     {len(enriched_records)}")
+        print(f"Total RECAMOUNT:            INR {cleaning_result.total_recamount:,.2f}")
+        print("-" * 70)
+        print(f"Target Sheet Tab:           {target_tab}")
+        print(f"Incoming records:           {cleaning_result.cleaned_count}")
+        print(f"Already present:            {reconcile_res.already_present_count}")
+        print(f"New:                        {reconcile_res.new_record_count}")
+        print(f"Conflicts:                  {reconcile_res.conflict_count}")
+        print(f"Appended rows:              {append_res.appended_count}")
+        print(f"Live Google Sheets writes:   {append_res.appended_count}")
+        print("-" * 70)
+        print(f"Cleaned CSV saved:          {cleaned_csv_path}")
+        print(f"Raw JSON saved:             {raw_saved_path}")
+        print(f"Status:                     SUCCESS")
+        print("=" * 70 + "\n")
+
         run_meta.status = RunStatus.SUCCESS
         run_meta.completed_at = datetime.now()
+        run_meta.execution_time_seconds = (run_meta.completed_at - run_meta.started_at).total_seconds()
+        run_meta.validation_status = "PASSED"
+        run_meta.notes.append(
+            f"Pipeline executed successfully. Appended {append_res.appended_count} new rows to '{target_tab}'."
+        )
         run_repo.save_run(run_meta)
         return 0
 
-    logger.info(
-        "Phase 0 project scaffold is operational. "
-        "Next milestone (Phase 1): Authenticate to Innervex with legitimate credentials."
-    )
-    run_meta.status = RunStatus.SUCCESS
-    run_meta.completed_at = datetime.now()
-    run_repo.save_run(run_meta)
-    return 0
+    except (AuthenticationError, InnervexConnectionError, InnervexResponseError) as e:
+        logger.error(f"Innervex error: {e.message}")
+        run_meta.status = RunStatus.FAILED
+        run_meta.completed_at = datetime.now()
+        run_meta.notes.append(f"Failed with {type(e).__name__}: {e.message}")
+        run_repo.save_run(run_meta)
+        return 1
+    except CriticalValidationError as e:
+        logger.critical(f"Critical validation failure: {e.message}")
+        run_meta.status = RunStatus.FAILED
+        run_meta.completed_at = datetime.now()
+        run_meta.notes.append(f"Failed with CriticalValidationError: {e.message}")
+        run_repo.save_run(run_meta)
+        return 1
+    except Exception as e:
+        logger.error(f"Unexpected error during pipeline run: {type(e).__name__}: {e}")
+        run_meta.status = RunStatus.FAILED
+        run_meta.completed_at = datetime.now()
+        run_meta.notes.append(f"Unexpected error: {type(e).__name__}: {e}")
+        run_repo.save_run(run_meta)
+        return 1
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
@@ -546,6 +906,114 @@ def cmd_sheets_discover(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    """Read-only live Google Sheets reconciliation against production workbook."""
+    import logging
+    from app.core.exceptions import GoogleAuthenticationError, GoogleSheetsError
+    from app.google_sheets.client import GoogleApiSheetsService, MockGoogleSheetsService
+    from app.google_sheets.reconciliation import (
+        LiveSheetReconciler,
+        derive_monthly_tab_name,
+        format_reconciliation_report,
+    )
+
+    # Keep log output quiet during CLI execution
+    logging.getLogger("pothys_reporting").setLevel(logging.CRITICAL)
+
+    config_bundle = load_config()
+    target_date = parse_target_date(args.report_date)
+    report_id = args.report_id or "subhiksham"
+
+    if report_id not in config_bundle.reports.reports:
+        print(f"Error: Unknown report '{report_id}'")
+        return 1
+    report_cfg = config_bundle.get_report(report_id)
+
+    data_dir = config_bundle.project_root / config_bundle.app.storage.data_dir
+    repo = FileSystemReportRepository(data_dir)
+
+    # 1. Retrieve cleaned records for report date
+    cleaned_records = repo.get_cleaned_records(report_id, target_date)
+    if not cleaned_records:
+        raw_payload = repo.get_raw_report(report_id, target_date)
+        if raw_payload:
+            cleaner = SchemeReportCleaner(report_cfg)
+            res = cleaner.clean_and_validate(raw_payload.data, report_date=target_date)
+            cleaned_records = res.records
+        else:
+            print(f"Error: No raw or cleaned report found for {target_date.isoformat()} under data/")
+            return 1
+
+    # 2. Derive target monthly tab name
+    tab_prefix = getattr(report_cfg, "target_sheet_tab_prefix", "SS")
+    target_tab = derive_monthly_tab_name(tab_prefix, target_date)
+
+    # 3. Resolve spreadsheet ID & credentials
+    spreadsheet_id = (
+        getattr(args, "spreadsheet_id", None)
+        or os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID")
+    )
+    sa_path = (
+        getattr(args, "service_account", None)
+        or os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH")
+        or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    )
+    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+    if getattr(args, "mock", False):
+        from app.google_sheets.discovery import EXPECTED_MONTHLY_COLUMNS
+        mock_meta = {
+            "sheets": [{"properties": {"title": target_tab}}]
+        }
+        service = MockGoogleSheetsService(mock_meta)
+        sid = spreadsheet_id or "MOCK_SPREADSHEET_ID"
+        service.sheets[f"{sid}:{target_tab}!A1:M"] = [EXPECTED_MONTHLY_COLUMNS[:13]]
+    else:
+        missing_items = []
+        if not sa_path and not sa_json:
+            missing_items.append("Google Service Account Key: GOOGLE_SERVICE_ACCOUNT_PATH or GOOGLE_APPLICATION_CREDENTIALS not set")
+        elif sa_path and not Path(sa_path).is_file():
+            missing_items.append(f"Google Service Account file not found at: '{sa_path}'")
+        if not spreadsheet_id:
+            missing_items.append("Spreadsheet ID: GOOGLE_SHEET_NEW_ENROLLMENT_ID not set in .env (or pass --spreadsheet-id)")
+
+        if missing_items:
+            print("Status: CONFIGURATION_MISSING")
+            for item in missing_items:
+                print(f"  - {item}")
+            return 1
+
+        try:
+            service = GoogleApiSheetsService(
+                service_account_path=sa_path,
+                service_account_json=sa_json,
+                read_only=True,
+            )
+        except GoogleAuthenticationError as e:
+            print(f"Status: AUTHENTICATION_FAILED\nError: {e.message}")
+            return 1
+        except Exception as e:
+            print(f"Status: ERROR\nUnexpected Error initializing Google Sheets: {type(e).__name__}: {e}")
+            return 1
+
+    # 4. Execute read-only reconciliation
+    reconciler = LiveSheetReconciler(service)
+    result = reconciler.reconcile_records(
+        spreadsheet_id=spreadsheet_id,
+        target_tab=target_tab,
+        report_date=target_date,
+        records=cleaned_records,
+    )
+
+    # 5. Output report
+    print(format_reconciliation_report(result))
+    print("Google Sheets writes performed: 0")
+
+    if result.conflict_count > 0 or result.status.startswith("FAILED"):
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -648,6 +1116,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="Simulate discovery using reference workbook schema for offline verification",
     )
 
+    # Command: reconcile
+    reconcile_parser = subparsers.add_parser(
+        "reconcile",
+        help="Read-only live Google Sheets reconciliation against production workbook",
+    )
+    reconcile_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD)",
+    )
+    reconcile_parser.add_argument(
+        "--report-id",
+        type=str,
+        default="subhiksham",
+        choices=["subhiksham", "viruksham"],
+        help="Report identifier to reconcile",
+    )
+    reconcile_parser.add_argument(
+        "--spreadsheet-id",
+        type=str,
+        default=None,
+        help="Target Google Spreadsheet ID (overrides GOOGLE_SHEET_NEW_ENROLLMENT_ID)",
+    )
+    reconcile_parser.add_argument(
+        "--service-account",
+        type=str,
+        default=None,
+        help="Path to Google Service Account JSON (overrides GOOGLE_SERVICE_ACCOUNT_PATH)",
+    )
+    reconcile_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Simulate reconciliation using mock service for offline testing",
+    )
+
     return parser
 
 
@@ -671,6 +1175,8 @@ def main() -> None:
         sys.exit(cmd_process(args))
     elif args.command == "sheets-discover":
         sys.exit(cmd_sheets_discover(args))
+    elif args.command == "reconcile":
+        sys.exit(cmd_reconcile(args))
     else:
         parser.print_help()
         sys.exit(1)

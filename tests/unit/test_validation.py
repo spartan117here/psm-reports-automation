@@ -71,3 +71,68 @@ def test_validation_engine_non_critical_continues():
     report = engine.create_report("RUN-TEST-002", [warning_check])
     assert report.has_critical_failures is False
     assert report.warning_count == 1
+
+
+def test_validation_engine_passed_logs_info(caplog):
+    """Verify that a PASSED validation check is logged at INFO level even with CRITICAL severity."""
+    import logging
+    caplog.set_level(logging.DEBUG, logger="pothys_reporting")
+    engine = ValidationEngine(halt_on_critical=True)
+
+    # check_targets_sanity has severity=CRITICAL, but here passes
+    passed_check = ValidationRules.check_targets_sanity({"CPT": 100000.0})
+    assert passed_check.status == ValidationStatus.PASSED
+    assert passed_check.severity == ValidationSeverity.CRITICAL
+
+    engine.create_report("RUN-LOG-001", [passed_check])
+
+    validation_records = [
+        r for r in caplog.records if r.name == "pothys_reporting" and "[VALIDATION]" in r.message
+    ]
+    assert len(validation_records) == 1
+    assert validation_records[0].levelno == logging.INFO
+    assert "PASSED: Branch targets configured correctly" in validation_records[0].message
+    # Critical severity must NOT cause ERROR level on PASSED checks
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+def test_validation_engine_warning_logs_warning(caplog):
+    """Verify that a WARNING status validation check is logged at WARNING level."""
+    import logging
+    caplog.set_level(logging.DEBUG, logger="pothys_reporting")
+    engine = ValidationEngine(halt_on_critical=True)
+
+    records = [
+        CleanedRecord(MSNO="DUPE-01", RECAMOUNT=100.0),
+        CleanedRecord(MSNO="DUPE-01", RECAMOUNT=200.0),
+    ]
+    warning_check = ValidationRules.check_duplicate_msno(records)
+    assert warning_check.status == ValidationStatus.WARNING
+
+    engine.create_report("RUN-LOG-002", [warning_check])
+
+    validation_records = [
+        r for r in caplog.records if r.name == "pothys_reporting" and "[VALIDATION]" in r.message
+    ]
+    assert len(validation_records) == 1
+    assert validation_records[0].levelno == logging.WARNING
+
+
+def test_validation_engine_failed_logs_error(caplog):
+    """Verify that a FAILED status validation check is logged at ERROR level."""
+    import logging
+    caplog.set_level(logging.DEBUG, logger="pothys_reporting")
+    engine = ValidationEngine(halt_on_critical=False)
+
+    records = [CleanedRecord(MSNO="M1", RECAMOUNT=-500.0)]
+    failed_check = ValidationRules.check_amount_sanity(records)
+    assert failed_check.status == ValidationStatus.FAILED
+
+    engine.create_report("RUN-LOG-003", [failed_check])
+
+    validation_records = [
+        r for r in caplog.records if r.name == "pothys_reporting" and "[VALIDATION]" in r.message
+    ]
+    assert len(validation_records) == 1
+    assert validation_records[0].levelno == logging.ERROR
+

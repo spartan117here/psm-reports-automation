@@ -127,3 +127,39 @@ def test_full_pipeline_dry_run(
     # 8. Verify idempotency lookup
     assert run_repo.is_already_processed(report_date, "subhiksham") is True
     assert run_repo.is_already_processed(date(2026, 10, 1), "subhiksham") is False
+
+
+def test_cmd_run_integration_dry_run(
+    config_bundle: AppConfigBundle,
+    sample_raw_payload: RawReportPayload,
+    capsys,
+    tmp_path,
+):
+    """
+    Integration test executing cmd_run in dry-run mode with mocked Innervex response,
+    verifying zero live writes, mock sheet appending, and structured summary.
+    """
+    from unittest.mock import patch
+    from app.cli import build_parser, cmd_run
+    from app.innervex.auth import AuthResult
+    from app.repositories.filesystem import FileSystemReportRepository
+
+    parser = build_parser()
+    args = parser.parse_args(["run", "--dry-run", "--report-date", "2026-10-04", "--force"])
+
+    mock_auth_res = AuthResult(
+        authenticated=True, http_status=200, cookies_present=True, token_present=True
+    )
+
+    with patch("app.innervex.auth.InnervexAuthenticator.login", return_value=mock_auth_res), \
+         patch("app.innervex.reports.SchemeReportFetcher.fetch_report", return_value=sample_raw_payload), \
+         patch.object(FileSystemReportRepository, "save_raw_report", return_value=tmp_path / "raw.json"), \
+         patch.object(FileSystemReportRepository, "save_cleaned_records", return_value=tmp_path / "clean.csv"):
+        exit_code = cmd_run(args)
+
+    assert exit_code == 0
+    captured = capsys.readouterr().out
+    assert "POTHYS REPORTING AUTOMATION -- PIPELINE DRY RUN SUMMARY" in captured
+    assert "Live Google Sheets writes:   0" in captured
+    assert "Status:                     DRY_RUN SUCCESS" in captured
+

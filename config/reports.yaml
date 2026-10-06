@@ -58,10 +58,10 @@ reports:
     endpoint_key: "scheme_new_cust_rep"
     innervex_action: "FindSchemeTransactionReport"
     scheme_name: "SWARNA VIRUKSHAM"
-    # Exact 2 sub-schemes to be finalized in Phase 2
+    # Confirmed 2 sub-schemes from Innervex GetSubSchName
     subschemes:
-      - "SWARNA VIRUKSHAM 1"
-      - "SWARNA VIRUKSHAM 2"
+      - "SWARNA VIRUKSHAM"
+      - "SWARNA VIRUKSHAM FLEXI"
     showroom_mode: "ALL_31"
     emp_code_filter: "All"
     promo_code_filter: "All"

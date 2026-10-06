@@ -37,6 +37,7 @@ class RunStatus(str, Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     PARTIAL = "PARTIAL"
+    DRY_RUN = "DRY_RUN"
 
 
 class ValidationSeverity(str, Enum):

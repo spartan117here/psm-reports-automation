@@ -40,3 +40,10 @@ def test_cleaned_record_serialization():
 
     restored = CleanedRecord(**dumped)
     assert restored == record
+
+
+def test_run_status_dry_run():
+    """Verify that RunStatus contains DRY_RUN enum value."""
+    assert RunStatus.DRY_RUN.value == "DRY_RUN"
+    assert RunStatus.DRY_RUN == "DRY_RUN"
+

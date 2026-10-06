@@ -3,7 +3,12 @@
 import logging
 from typing import List
 from app.core.exceptions import CriticalValidationError
-from app.core.models import ValidationReport, ValidationResult, ValidationSeverity
+from app.core.models import (
+    ValidationReport,
+    ValidationResult,
+    ValidationSeverity,
+    ValidationStatus,
+)
 
 logger = logging.getLogger("pothys_reporting")
 
@@ -19,10 +24,11 @@ class ValidationEngine:
         report = ValidationReport(run_id=run_id)
         for res in results:
             report.add_result(res)
-            log_fn = logger.info
-            if res.severity == ValidationSeverity.WARNING:
+            if res.status == ValidationStatus.PASSED:
+                log_fn = logger.info
+            elif res.status == ValidationStatus.WARNING:
                 log_fn = logger.warning
-            elif res.severity == ValidationSeverity.CRITICAL:
+            else:
                 log_fn = logger.error
             log_fn(f"[VALIDATION] [{res.check_name}] {res.status.value}: {res.message}")
 
