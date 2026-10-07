@@ -99,13 +99,30 @@ reports:
     report_id: "closing"
     display_name: "Scheme Closing Report"
     endpoint_key: "scheme_closing_rep"
-    innervex_action: "FindSchemeClosingReport"  # Subject to confirmation
-    scheme_name: "ALL_ACTIVE"                   # Subject to confirmation
-    status_options_count: 5                     # Subject to confirmation
-    showroom_mode: "ALL_31"
+    innervex_action: "loadData"
+    scheme_name: "ALL_ACTIVE"
+    showroom_mode: "ALL_32"
+    emp_code_filter: "All"
+    promo_code_filter: "All"
+    export_mode: "EXPORT"
+    preamble_rows: 3
     raw_expected_column_count: 15
-    cleaned_column_count: 7
-    # Note: Exact 7-column subset to be confirmed in Phase 7
-    output_columns: []
-    target_sheet_tab_prefix: "CLOSING"
+    output_columns:
+      - "DOCDATE"
+      - "NAME"
+      - "MOBILE"
+      - "SCHEMENAME"
+      - "WEIGHT"
+      - "STATUS"
+      - "SHOWROOM"
+    discard_columns:
+      - "SNO"
+      - "REDEMNO"
+      - "PASSBOOK"
+      - "PURCHASEWEIGHT"
+      - "SCHEME AMOUNT"
+      - "DEDUCTION AMOUNT"
+      - "NET AMOUNT"
+      - "PAID INS"
+    target_sheet_tab_prefix: "October - 2026"
     deduplication_key: "REDEMNO"

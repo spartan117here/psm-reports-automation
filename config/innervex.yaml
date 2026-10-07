@@ -34,5 +34,5 @@ innervex:
   endpoints:
     # Confirmed observed endpoint for Scheme New Memberlist (Subhiksham & Viruksham)
     scheme_new_cust_rep: "/schemeNewCustRep"
-    # Scheme Closing Report endpoint (subject to Phase 7 verification)
-    scheme_closing_rep: "/schemeClosingReport"
+    # Scheme Closing Report endpoint (confirmed in Phase 7)
+    scheme_closing_rep: "/SchemeClosingReport"

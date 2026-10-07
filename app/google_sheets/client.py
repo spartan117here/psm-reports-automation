@@ -56,6 +56,11 @@ class GoogleSheetsService(ABC):
         pass
 
     @abstractmethod
+    def clear_range(self, spreadsheet_id: str, range_name: str) -> bool:
+        """Clear cell contents in a specific range."""
+        pass
+
+    @abstractmethod
     def get_existing_column_values(
         self, spreadsheet_id: str, tab_name: str, column_letter: str
     ) -> Set[str]:
@@ -107,6 +112,13 @@ class MockGoogleSheetsService(GoogleSheetsService):
     def update_range(self, spreadsheet_id: str, range_name: str, values: List[List[Any]]) -> bool:
         key = f"{spreadsheet_id}:{range_name}"
         self.sheets[key] = values
+        self.formulas[key] = values
+        return True
+
+    def clear_range(self, spreadsheet_id: str, range_name: str) -> bool:
+        key = f"{spreadsheet_id}:{range_name}"
+        self.sheets[key] = []
+        self.formulas[key] = []
         return True
 
     def get_existing_column_values(
@@ -282,6 +294,22 @@ class GoogleApiSheetsService(GoogleSheetsService):
         except Exception as e:
             raise GoogleSheetsError(
                 f"Failed to update range '{range_name}' in spreadsheet '{spreadsheet_id}': {e}"
+            ) from e
+
+    def clear_range(self, spreadsheet_id: str, range_name: str) -> bool:
+        """Clear cell contents from a specific range."""
+        if self.read_only:
+            raise GoogleSheetsError("Cannot clear cells: service is initialized in READ-ONLY mode.")
+        try:
+            self.service.spreadsheets().values().clear(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                body={},
+            ).execute()
+            return True
+        except Exception as e:
+            raise GoogleSheetsError(
+                f"Failed to clear range '{range_name}' in spreadsheet '{spreadsheet_id}': {e}"
             ) from e
 
     def get_existing_column_values(
