@@ -243,17 +243,19 @@ def normalize_sheet_date(val: Any) -> Optional[date]:
         except Exception:
             pass
 
-    # Strip time part if present (e.g. '10/06/26 10:41:04' -> '10/06/26')
-    date_part = s.split(" ")[0].strip()
+    # Strip time part if present (e.g. '06/10/26 10:41:04' -> '06/10/26')
+    date_part = s.split("T")[0].split(" ")[0].strip()
 
     for fmt in (
-        "%m/%d/%y",
         "%d/%m/%Y",
         "%d/%m/%y",
-        "%m/%d/%Y",
         "%Y-%m-%d",
         "%d-%m-%Y",
         "%d-%m-%y",
+        "%d.%m.%Y",
+        "%d.%m.%y",
+        "%m/%d/%Y",
+        "%m/%d/%y",
     ):
         try:
             return datetime.strptime(date_part, fmt).date()

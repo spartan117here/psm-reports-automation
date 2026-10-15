@@ -736,9 +736,10 @@ def cmd_auth_test(args: argparse.Namespace) -> int:
         return 0
     except AuthenticationError as e:
         status_code = e.details.get("status_code", "Failed") if hasattr(e, "details") else "Failed"
+        cookies_present = e.details.get("cookies_present", False) if hasattr(e, "details") else False
         print(f"HTTP status: {status_code}")
         print("Authenticated: False")
-        print("Session cookie present: False")
+        print(f"Session cookie present: {cookies_present}")
         print("Token present: False")
         print(f"\nAuthentication failed: {e.message}")
         return 1
@@ -1278,6 +1279,325 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
     return 0 if result.validation.status == "PASS" else 1
 
 
+def seed_mock_screenshot_data(
+    mock_service: Any,
+    report_date: Optional[date] = None,
+    enrollment_date: Optional[date] = None,
+    closing_date: Optional[date] = None,
+) -> None:
+    """Seed MockGoogleSheetsService with realistic enrollment and closing sheet tables for offline testing."""
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    default_d = report_date or date(2026, 10, 14)
+    d_enrollment = enrollment_date or default_d
+    d_closing = closing_date or default_d
+
+    enrollment_date_str = d_enrollment.strftime("%d/%m/%Y")
+    closing_date_str = d_closing.strftime("%d/%m/%Y")
+
+    enrollment_id = os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID", "mock_enrollment_id")
+    closing_id = os.getenv("GOOGLE_SHEET_CLOSED_REJOINING_ID", "mock_closing_id")
+
+    meta_enrollment = {
+        "properties": {"title": "New Enrollment from April 2026"},
+        "sheets": [
+            {"properties": {"title": "Consolidate Report - Oct", "sheetId": 928019529}},
+        ],
+    }
+    mock_service.set_metadata(meta_enrollment, spreadsheet_id=enrollment_id)
+    mock_service.set_metadata(meta_enrollment, spreadsheet_id="mock_enrollment_id")
+
+    enrollment_rows = [
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        [f"New Enrollment as on {enrollment_date_str}", "", "", "", "", "", "", ""],
+        ["Branch", "Target Value", "Subhiksham", "Viruksham", "Total", "Yet to Achieve", "Achieved %"],
+        ["", "", "", "", "", "", ""],
+        ["TVL", "40000000", "1482500", "13754707", "15237207", "-24762793", "38%"],
+        ["CPT", "72000000", "3506000", "26847569", "30353569", "-41646431", "42%"],
+        ["TVM", "27000000", "844500", "8363706", "9208206", "-17791794", "34%"],
+        ["TPJ", "40000000", "1125000", "13815107", "14940107", "-25059893", "37%"],
+        ["CBE", "30000000", "999500", "11879829", "12879329", "-17120671", "43%"],
+        ["SLM", "30000000", "699000", "6365078", "7064078", "-22935922", "24%"],
+        ["PNM", "20000000", "898000", "5159102", "6057102", "-13942898", "30%"],
+        ["PADI", "54000000", "2701000", "19292563", "21993563", "-32006437", "41%"],
+        ["KANCHI", "27000000", "1253500", "6742097", "7995597", "-19004403", "30%"],
+        ["ONLINE", "", "984000", "1312900", "2296900"],
+        ["Total", "313000000", "14493000", "113532658", "128025658", "-214271242", "41%"],
+        ["", "", "", "", "", "", ""],
+        ["Branch ", "Count Target", "Achieved Count", "", "", "", "SS + SV + DG + DS", "AVG"],
+        ["", "SS + SV + DG + DS", "Subhiksham", "Viruksham", "DigiGold", "DigiSilver"],
+        ["TVL", "3000", "223", "37", "445", "270", "975", "75"],
+        ["CPT", "6000", "360", "78", "1149", "231", "1818", "140"],
+        ["TVM", "4000", "113", "13", "1135", "30", "1291", "99"],
+        ["TPJ", "5000", "234", "34", "1026", "465", "1759", "135"],
+        ["CBE", "7000", "174", "38", "1116", "642", "1970", "152"],
+        ["SLM", "3000", "124", "22", "747", "337", "1230", "95"],
+        ["PNM", "2000", "101", "17", "252", "106", "476", "37"],
+        ["PADI", "6000", "332", "69", "920", "250", "1571", "121"],
+        ["KANCHI", "", "224", "24", "1521", "257", "2026", "156"],
+        ["E COMM", "", "149", "13", "2,449", "487", "3,098", "238"],
+        ["Total", "36000", "2034", "345", "10760", "3075", "16214", "1247"],
+    ]
+    mock_service.update_range(enrollment_id, "'Consolidate Report - Oct'!E1:M35", enrollment_rows)
+    mock_service.update_range("mock_enrollment_id", "'Consolidate Report - Oct'!E1:M35", enrollment_rows)
+
+    meta_closing = {
+        "properties": {"title": "Closed Member & Rejoining Report"},
+        "sheets": [
+            {"properties": {"title": "October - 2026", "sheetId": 2105033369}},
+        ],
+    }
+    mock_service.set_metadata(meta_closing, spreadsheet_id=closing_id)
+    mock_service.set_metadata(meta_closing, spreadsheet_id="mock_closing_id")
+
+    closing_rows = [
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", ""],
+        ["", "", "SCHEME REJOINING REPORT AS ON ", "", "", "", "", closing_date_str],
+        ["", "", "SHOWROOM", "CLOSED", "REJOIN SS", "REJOIN SV", "TOTAL REJOIN", "REJOIN %"],
+        ["", "", "TVL", "207", "38", "5", "43", "20.77%"],
+        ["", "", "CPT", "346", "62", "5", "67", "19.36%"],
+        ["", "", "TVM", "194", "38", "4", "42", "21.65%"],
+        ["", "", "TPJ", "285", "53", "4", "57", "20.00%"],
+        ["", "", "CBE", "243", "48", "2", "50", "20.58%"],
+        ["", "", "SLM", "122", "27", "4", "31", "25.41%"],
+        ["", "", "PNM", "101", "10", "6", "16", "15.84%"],
+        ["", "", "PADI", "96", "13", "3", "16", "16.67%"],
+        ["", "", "KPM", "11", "1", "3", "4", "36.36%"],
+        ["", "", "TOTAL", "1605", "290", "36", "326", "20.31%"],
+        ["", "", "CLOSED WEIGHT", "", "", "CLOSED COUNT", "", ""],
+        ["", "", "SHOWROOM", "COUNT", "WEIGHT", "SHOWROOM", "SS", "SV"],
+        ["", "", "TVL", "207", "1559.92", "TVL", "187", "20"],
+        ["", "", "CPT", "346", "3345.20", "CPT", "269", "77"],
+        ["", "", "TVM", "194", "1121.06", "TVM", "170", "24"],
+        ["", "", "TPJ", "285", "1692.79", "TPJ", "241", "44"],
+        ["", "", "CBE", "243", "964.60", "CBE", "216", "27"],
+        ["", "", "SLM", "122", "519.03", "SLM", "96", "26"],
+        ["", "", "PNM", "101", "610.73", "PNM", "90", "11"],
+        ["", "", "PADI", "96", "1003.75", "PADI", "74", "22"],
+        ["", "", "KPM", "11", "64.69", "KPM", "8", "3"],
+        ["", "", "TOTAL", "1605", "10881.76", "TOTAL", "1351", "254"],
+    ]
+    mock_service.update_range(closing_id, "'October - 2026'!J1:R30", closing_rows)
+    mock_service.update_range("mock_closing_id", "'October - 2026'!J1:R30", closing_rows)
+
+
+def cmd_screenshot(args: argparse.Namespace) -> int:
+    """Capture presentation-ready screenshots of Google Sheets executive tables."""
+    from app.core.exceptions import TableValidationError
+    from app.google_sheets.client import GoogleApiSheetsService, MockGoogleSheetsService
+    from app.reporting.screenshots import GoogleSheetsScreenshotEngine
+
+    target_date = parse_target_date(getattr(args, "report_date", None))
+
+    print("=" * 70)
+    print("GOOGLE SHEETS REPORT SCREENSHOT ENGINE")
+    print("=" * 70)
+    print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+
+    config_bundle = load_config()
+
+    output_dir = (
+        Path(args.output_dir)
+        if getattr(args, "output_dir", None)
+        else config_bundle.project_root / "data" / "screenshots"
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    sa_path = getattr(args, "service_account", None) or os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+    if getattr(args, "mock", False):
+        print("Mode: Mock / Offline Mode")
+        sheets_service = MockGoogleSheetsService()
+        seed_mock_screenshot_data(sheets_service, report_date=target_date)
+    else:
+        print("Mode: Production Live Mode")
+        try:
+            sheets_service = GoogleApiSheetsService(
+                service_account_path=sa_path,
+                service_account_json=sa_json,
+                read_only=True,
+            )
+            print("Google Service Account Authentication: OK")
+        except Exception as e:
+            print(f"AUTHENTICATION FAILURE: {type(e).__name__}: {e}")
+            return 1
+
+    engine = GoogleSheetsScreenshotEngine(
+        sheets_service=sheets_service,
+        config_bundle=config_bundle,
+        output_dir=output_dir,
+        dpi=getattr(args, "dpi", 200),
+    )
+
+    target = getattr(args, "target", "all").lower()
+    print(f"Target: {target.upper()}")
+    print(f"Output Directory: {output_dir}")
+
+    results = []
+    try:
+        if target in ("all", "enrollment"):
+            print("\nCapturing Enrollment Report...")
+            res_enrollment = engine.capture_enrollment(expected_date=target_date)
+            results.append(res_enrollment)
+            print(f"  [OK] Validated Table: '{res_enrollment.report_title}'")
+            print(f"  [OK] Exported Range:   {res_enrollment.range_used} (gid: {res_enrollment.gid})")
+            print(f"  [OK] Saved PNG:        {res_enrollment.output_path}")
+            print(f"  [OK] Dimensions:       {res_enrollment.dimensions[0]}x{res_enrollment.dimensions[1]} ({res_enrollment.file_size_bytes:,} bytes)")
+
+        if target in ("all", "closing"):
+            print("\nCapturing Closing Report...")
+            res_closing = engine.capture_closing(expected_date=target_date)
+            results.append(res_closing)
+            print(f"  [OK] Validated Table: '{res_closing.report_title}'")
+            print(f"  [OK] Exported Range:   {res_closing.range_used} (gid: {res_closing.gid})")
+            print(f"  [OK] Saved PNG:        {res_closing.output_path}")
+            print(f"  [OK] Dimensions:       {res_closing.dimensions[0]}x{res_closing.dimensions[1]} ({res_closing.file_size_bytes:,} bytes)")
+
+        if target == "all" and len(results) == 2:
+            if results[0].report_date != results[1].report_date:
+                raise TableValidationError(
+                    f"Mismatched report dates between screenshots: "
+                    f"Enrollment has {results[0].report_date}, Closing has {results[1].report_date}."
+                )
+
+    except Exception as e:
+        print(f"\nSCREENSHOT GENERATION FAILED: {type(e).__name__}: {e}")
+        return 1
+
+    print("\n" + "=" * 70)
+    print("SCREENSHOT GENERATION SUMMARY")
+    print("=" * 70)
+    for res in results:
+        print(f"Report:          {res.target.upper()}")
+        print(f"Workbook:        {res.workbook_name}")
+        print(f"Worksheet:       {res.worksheet_name} (gid: {res.gid})")
+        print(f"Report Date:     {res.report_date}")
+        print(f"Exported Range:  {res.range_used}")
+        print(f"Dimensions:      {res.dimensions[0]}x{res.dimensions[1]} px")
+        print(f"File Size:       {res.file_size_bytes:,} bytes")
+        print(f"File Path:       {res.output_path}")
+        print("-" * 70)
+
+    print(f"TOTAL SCREENSHOTS CAPTURED: {len(results)}")
+    print("ZERO GOOGLE SHEETS WRITES PERFORMED (STRICT READ-ONLY ENFORCED)")
+    return 0
+
+
+def cmd_daily_pipeline(args: argparse.Namespace) -> int:
+    """
+    Execute the unified 4-stage daily reporting automation workflow:
+    1. SS & SV Enrollment Data Download & Google Sheets Append
+    2. DigiGold & DigiSilver Synchronization & Date Header Update
+    3. Scheme Closing Report Synchronization & Rejoining Summary Update
+    4. Verified Screenshot Generation (stops if any stage failed or data is stale)
+    """
+    target_date = parse_target_date(getattr(args, "report_date", None))
+    today = date.today()
+
+    print("=" * 75)
+    print("POTHYS SWARNA MAHAL DAILY REPORTING AUTOMATION PIPELINE")
+    print("=" * 75)
+    print(f"Execution Date:     {today.strftime('%d/%m/%Y')} ({today.isoformat()})")
+    print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+    mode_str = "MOCK / OFFLINE" if getattr(args, "mock", False) else ("DRY RUN" if getattr(args, "dry_run", False) else "LIVE PRODUCTION")
+    print(f"Pipeline Mode:      {mode_str}")
+    print("=" * 75)
+
+    # -------------------------------------------------------------------------
+    # STAGE 1: SS & SV Enrollment Synchronization
+    # -------------------------------------------------------------------------
+    print("\n>>> STAGE 1: ENROLLMENT DATA SYNCHRONIZATION (SUBHIKSHAM & VIRUKSHAM)")
+    print("-" * 75)
+    for rep in ["subhiksham", "viruksham"]:
+        print(f"\n[Stage 1] Processing {rep.upper()} for {target_date.isoformat()}...")
+        rep_args = argparse.Namespace(
+            report_date=target_date.isoformat(),
+            report_id=rep,
+            dry_run=getattr(args, "dry_run", False),
+            force=getattr(args, "force", False),
+        )
+        if getattr(args, "mock", False):
+            print(f"[Stage 1] Mock simulation for {rep.upper()}: SUCCESS")
+        else:
+            rc = cmd_run(rep_args)
+            if rc != 0:
+                print(f"\n[FAIL] STAGE 1 FAILED during {rep.upper()} processing.")
+                print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
+                return 1
+
+    print("\n[PASS] STAGE 1: Enrollment data synchronized successfully.")
+
+    # -------------------------------------------------------------------------
+    # STAGE 2: DigiGold & DigiSilver Synchronization
+    # -------------------------------------------------------------------------
+    print("\n>>> STAGE 2: DIGIGOLD & DIGISILVER SYNCHRONIZATION")
+    print("-" * 75)
+    digi_args = argparse.Namespace(
+        report_date=target_date.isoformat(),
+        digi_spreadsheet_id=getattr(args, "digi_spreadsheet_id", None),
+        spreadsheet_id=getattr(args, "spreadsheet_id", None),
+        service_account=getattr(args, "service_account", None),
+        dry_run=getattr(args, "dry_run", False),
+        mock=getattr(args, "mock", False),
+    )
+    rc_digi = cmd_digi_sync(digi_args)
+    if rc_digi != 0:
+        print("\n[FAIL] STAGE 2 FAILED: DigiGold/DigiSilver synchronization failed.")
+        print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
+        return 1
+
+    print("\n[PASS] STAGE 2: Digi counts and enrollment title synchronized successfully.")
+
+    # -------------------------------------------------------------------------
+    # STAGE 3: Scheme Closing Report Synchronization
+    # -------------------------------------------------------------------------
+    print("\n>>> STAGE 3: SCHEME CLOSING REPORT SYNCHRONIZATION")
+    print("-" * 75)
+    closing_args = argparse.Namespace(
+        report_date=target_date.isoformat(),
+        spreadsheet_id=getattr(args, "closing_spreadsheet_id", None),
+        service_account=getattr(args, "service_account", None),
+        dry_run=getattr(args, "dry_run", False),
+        force=getattr(args, "force", False),
+        mock=getattr(args, "mock", False),
+    )
+    rc_closing = cmd_closing_sync(closing_args)
+    if rc_closing != 0:
+        print("\n[FAIL] STAGE 3 FAILED: Closing report synchronization failed.")
+        print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
+        return 1
+
+    print("\n[PASS] STAGE 3: Closing report summary synchronized successfully.")
+
+    # -------------------------------------------------------------------------
+    # STAGE 4: Verified Screenshot Generation
+    # -------------------------------------------------------------------------
+    print("\n>>> STAGE 4: VERIFIED SCREENSHOT GENERATION")
+    print("-" * 75)
+    screenshot_args = argparse.Namespace(
+        report_date=target_date.isoformat(),
+        target="all",
+        output_dir=getattr(args, "output_dir", None),
+        dpi=getattr(args, "dpi", 200),
+        service_account=getattr(args, "service_account", None),
+        mock=getattr(args, "mock", False),
+    )
+    rc_screenshot = cmd_screenshot(screenshot_args)
+    if rc_screenshot != 0:
+        print("\n[FAIL] STAGE 4 FAILED: Verified screenshot generation failed.")
+        print("Pipeline HALTED. Delivery blocked to prevent distributing desynchronized reports.")
+        return 1
+
+    print("\n" + "=" * 75)
+    print("ALL 4 PIPELINE STAGES COMPLETED SUCCESSFULLY FOR TARGET DATE:", target_date.isoformat())
+    print("=" * 75)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -1495,6 +1815,93 @@ def build_parser() -> argparse.ArgumentParser:
         help="Simulate execution using mock service for offline testing",
     )
 
+    # Command: screenshot
+    screenshot_parser = subparsers.add_parser(
+        "screenshot",
+        help="Capture executive screenshot card(s) from Google Sheets reports",
+    )
+    screenshot_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD). Defaults to yesterday.",
+    )
+    screenshot_parser.add_argument(
+        "--target",
+        type=str,
+        default="all",
+        choices=["all", "enrollment", "closing"],
+        help="Target report to capture (all, enrollment, closing). Defaults to all.",
+    )
+    screenshot_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Custom destination directory for rendered PNG screenshots (defaults to data/screenshots)",
+    )
+    screenshot_parser.add_argument(
+        "--dpi",
+        type=int,
+        default=200,
+        help="Rendering resolution in DPI (default: 200)",
+    )
+    screenshot_parser.add_argument(
+        "--service-account",
+        type=str,
+        default=None,
+        help="Path to Google Service Account JSON (overrides GOOGLE_SERVICE_ACCOUNT_PATH)",
+    )
+    screenshot_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Execute using MockGoogleSheetsService for offline testing",
+    )
+
+    # Command: run-daily
+    daily_parser = subparsers.add_parser(
+        "run-daily",
+        help="Execute unified 4-stage daily reporting automation pipeline",
+    )
+    daily_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD). Defaults to yesterday.",
+    )
+    daily_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate execution without modifying external Google Sheets",
+    )
+    daily_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass idempotency checks and rerun for existing date",
+    )
+    daily_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Execute using Mock services for offline verification",
+    )
+    daily_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Custom destination directory for rendered PNG screenshots",
+    )
+    daily_parser.add_argument(
+        "--dpi",
+        type=int,
+        default=200,
+        help="Rendering resolution in DPI (default: 200)",
+    )
+    daily_parser.add_argument(
+        "--service-account",
+        type=str,
+        default=None,
+        help="Path to Google Service Account JSON (overrides GOOGLE_SERVICE_ACCOUNT_PATH)",
+    )
+
     return parser
 
 
@@ -1508,6 +1915,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "run":
         sys.exit(cmd_run(args))
+    elif args.command == "run-daily":
+        sys.exit(cmd_daily_pipeline(args))
     elif args.command == "validate":
         sys.exit(cmd_validate(args))
     elif args.command == "auth-test":
@@ -1524,6 +1933,8 @@ def main() -> None:
         sys.exit(cmd_digi_sync(args))
     elif args.command == "closing-sync":
         sys.exit(cmd_closing_sync(args))
+    elif args.command == "screenshot":
+        sys.exit(cmd_screenshot(args))
     else:
         parser.print_help()
         sys.exit(1)

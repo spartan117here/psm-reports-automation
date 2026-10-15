@@ -112,8 +112,28 @@ class ReportItemConfig(BaseModel):
     deduplication_key: str = "MSNO"
 
 
+class ScreenshotTargetConfig(BaseModel):
+    target_id: str
+    display_name: str
+    workbook_env_key: str
+    workbook_name: str
+    worksheet_name: str
+    candidate_range: str
+    validated_range: str
+    title_pattern: str
+    filename_prefix: str
+
+
+class ScreenshotsConfig(BaseModel):
+    output_dir: str = "data/screenshots"
+    dpi: int = 200
+    padding: int = 20
+    targets: Dict[str, ScreenshotTargetConfig] = Field(default_factory=dict)
+
+
 class ReportsConfig(BaseModel):
     reports: Dict[str, ReportItemConfig] = Field(default_factory=dict)
+    screenshots: Optional[ScreenshotsConfig] = None
 
 
 class LocationNamingConfig(BaseModel):
@@ -148,6 +168,11 @@ class AppConfigBundle(BaseModel):
         if report_id not in self.reports.reports:
             raise ConfigurationError(f"Report definition '{report_id}' not found in reports.yaml")
         return self.reports.reports[report_id]
+
+    def get_screenshot_target(self, target_id: str) -> ScreenshotTargetConfig:
+        if not self.reports.screenshots or target_id not in self.reports.screenshots.targets:
+            raise ConfigurationError(f"Screenshot target '{target_id}' not found in reports.yaml")
+        return self.reports.screenshots.targets[target_id]
 
 
 def _read_yaml(path: Path) -> Dict[str, Any]:

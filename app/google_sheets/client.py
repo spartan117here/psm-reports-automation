@@ -14,9 +14,11 @@ logger = logging.getLogger("pothys_reporting")
 # Default Google Sheets API Scopes
 DEFAULT_SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
 ]
 READ_WRITE_SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
 ]
 
 
@@ -72,6 +74,13 @@ class GoogleSheetsService(ABC):
         """Ensure worksheet grid dimension has at least required_rows capacity."""
         pass
 
+    @abstractmethod
+    def export_pdf(
+        self, spreadsheet_id: str, gid: Any, range_name: Optional[str] = None
+    ) -> bytes:
+        """Export a sheet or cell range to PDF bytes."""
+        pass
+
 
 class MockGoogleSheetsService(GoogleSheetsService):
     """In-memory mock service for testing and offline execution."""
@@ -79,16 +88,56 @@ class MockGoogleSheetsService(GoogleSheetsService):
     def __init__(self, metadata: Optional[Dict[str, Any]] = None):
         self.sheets: Dict[str, List[List[Any]]] = {}
         self.formulas: Dict[str, List[List[Any]]] = {}
+        self.mock_pdfs: Dict[str, bytes] = {}
+        self.metadata_by_id: Dict[str, Dict[str, Any]] = {}
         self.metadata = metadata or {
             "properties": {"title": "Mock Spreadsheet"},
             "sheets": [],
         }
 
-    def set_metadata(self, metadata: Dict[str, Any]) -> None:
+    def set_metadata(self, metadata: Dict[str, Any], spreadsheet_id: Optional[str] = None) -> None:
         self.metadata = metadata
+        if spreadsheet_id:
+            self.metadata_by_id[spreadsheet_id] = metadata
 
     def get_spreadsheet_metadata(self, spreadsheet_id: str) -> Dict[str, Any]:
+        if spreadsheet_id in self.metadata_by_id:
+            return self.metadata_by_id[spreadsheet_id]
         return self.metadata
+
+    def set_mock_pdf(self, key: str, pdf_bytes: bytes) -> None:
+        """Set custom mock PDF bytes for a given key or range."""
+        self.mock_pdfs[key] = pdf_bytes
+
+    def export_pdf(
+        self, spreadsheet_id: str, gid: Any, range_name: Optional[str] = None
+    ) -> bytes:
+        """Export mock PDF bytes or generate synthetic PDF."""
+        key = f"{spreadsheet_id}:{gid}:{range_name}"
+        if key in self.mock_pdfs:
+            return self.mock_pdfs[key]
+        sheet_key = f"{spreadsheet_id}:{gid}"
+        if sheet_key in self.mock_pdfs:
+            return self.mock_pdfs[sheet_key]
+        if range_name and range_name in self.mock_pdfs:
+            return self.mock_pdfs[range_name]
+
+        # Generate synthetic valid PDF using PyMuPDF for offline tests
+        try:
+            import pymupdf
+            doc = pymupdf.open()
+            page = doc.new_page(width=612, height=792)
+            content = f"Mock Sheet (gid: {gid})\nRange: {range_name or 'Full Sheet'}\n"
+            # Add any mocked rows
+            for k, rows in self.sheets.items():
+                if range_name and (range_name in k or str(gid) in k or "October" in k or "Consolidate" in k):
+                    for r in rows:
+                        content += " ".join(str(cell) for cell in r) + "\n"
+            page.insert_text((72, 72), content)
+            return doc.tobytes()
+        except Exception as e:
+            logger.warning(f"Failed to generate synthetic PDF: {e}")
+            return b"%PDF-1.4 mock pdf content"
 
     def read_range(
         self, spreadsheet_id: str, range_name: str, value_render_option: str = "FORMATTED_VALUE"
@@ -97,7 +146,20 @@ class MockGoogleSheetsService(GoogleSheetsService):
             key = f"{spreadsheet_id}:{range_name}"
             if key in self.formulas:
                 return self.formulas[key]
-        return self.sheets.get(f"{spreadsheet_id}:{range_name}", [])
+        direct = self.sheets.get(f"{spreadsheet_id}:{range_name}")
+        if direct is not None:
+            return direct
+        # Fallback 1: check with/without single quotes
+        alt_range = range_name.replace("'", "") if "'" in range_name else f"'{range_name}'"
+        alt_key = f"{spreadsheet_id}:{alt_range}"
+        if alt_key in self.sheets:
+            return self.sheets[alt_key]
+        # Fallback 2: match worksheet prefix if only one range is stored for that worksheet
+        clean_tab = range_name.split("!")[0].replace("'", "")
+        for k, v in self.sheets.items():
+            if k.startswith(f"{spreadsheet_id}:") and clean_tab in k.split("!")[0]:
+                return v
+        return []
 
     def read_formulas(self, spreadsheet_id: str, range_name: str) -> List[List[Any]]:
         return self.read_range(spreadsheet_id, range_name, value_render_option="FORMULA")
@@ -211,10 +273,47 @@ class GoogleApiSheetsService(GoogleSheetsService):
                     "GOOGLE_SERVICE_ACCOUNT_PATH, or GOOGLE_SERVICE_ACCOUNT_JSON."
                 ) from e
 
+        self.credentials = credentials
         try:
             return build("sheets", "v4", credentials=credentials, cache_discovery=False)
         except Exception as e:
             raise GoogleSheetsError(f"Failed to initialize Google Sheets API client: {e}") from e
+
+    def export_pdf(
+        self, spreadsheet_id: str, gid: Any, range_name: Optional[str] = None
+    ) -> bytes:
+        """Export a Google Sheets range or worksheet to PDF bytes."""
+        if not self.credentials:
+            raise GoogleSheetsError("No credentials available for PDF export.")
+
+        from google.auth.transport.requests import AuthorizedSession
+        import urllib.parse
+
+        session = AuthorizedSession(self.credentials)
+        url = (
+            f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export"
+            f"?format=pdf&gid={gid}"
+            f"&size=letter&portrait=true&fitw=true&gridlines=true"
+            f"&printtitle=false&sheetnames=false&fzr=false"
+        )
+        if range_name:
+            url += f"&range={urllib.parse.quote(range_name)}"
+
+        try:
+            resp = session.get(url, timeout=60)
+            if resp.status_code != 200:
+                raise GoogleSheetsError(
+                    f"Google Sheets PDF export failed with HTTP {resp.status_code}: {resp.text[:200]}"
+                )
+            if "application/pdf" not in resp.headers.get("content-type", ""):
+                raise GoogleSheetsError(
+                    f"Unexpected content type from PDF export: {resp.headers.get('content-type')}"
+                )
+            return resp.content
+        except GoogleSheetsError:
+            raise
+        except Exception as e:
+            raise GoogleSheetsError(f"Failed to export Google Sheet to PDF: {e}") from e
 
     def get_spreadsheet_metadata(self, spreadsheet_id: str) -> Dict[str, Any]:
         """Fetch workbook metadata including sheets, titles, and dimensions."""

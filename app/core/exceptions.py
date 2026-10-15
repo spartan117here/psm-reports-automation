@@ -58,3 +58,12 @@ class GoogleAuthenticationError(GoogleSheetsError, AuthenticationError):
 
 class DeliveryError(ReportingAutomationError):
     """Raised when report delivery to recipients fails."""
+
+
+class ScreenshotError(ReportingAutomationError):
+    """Raised when screenshot capture, export, or rendering fails."""
+
+
+class TableValidationError(ScreenshotError, DataValidationError):
+    """Raised when report table structure or boundaries fail validation."""
+

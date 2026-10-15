@@ -237,14 +237,23 @@ class InnervexAuthenticator(AuthStrategy):
                 is_success = True
 
         if not is_success:
-            err_msg = (
-                json_data.get("message")
-                or json_data.get("errorMessage")
-                or json_data.get("error")
-                or "Invalid credentials or unauthorized login"
-            )
+            raw_err = json_data.get("message") or json_data.get("errorMessage")
+            if not raw_err:
+                error_field = json_data.get("error")
+                if error_field in (True, "true", "True") and json_data.get("status") == "failure":
+                    raw_err = "Server rejected login (status=failure). Please check credentials and client IP authorization."
+                elif error_field and error_field not in (True, "true", "True"):
+                    raw_err = error_field
+                else:
+                    raw_err = "Invalid credentials or unauthorized login"
+            err_msg = str(raw_err)
             logger.warning("Innervex authentication rejected by server: %s", err_msg)
-            raise AuthenticationError(f"Innervex authentication failed: {err_msg}")
+            cookie_name = self.config.auth.session_cookie_name
+            has_session_cookie = cookie_name in session.cookies or len(session.cookies) > 0
+            raise AuthenticationError(
+                f"Innervex authentication failed: {err_msg}",
+                details={"status_code": response.status_code, "cookies_present": has_session_cookie},
+            )
 
         # 7. Check session cookies
         cookie_name = self.config.auth.session_cookie_name

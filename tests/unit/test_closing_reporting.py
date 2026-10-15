@@ -485,6 +485,36 @@ def test_date_values_in_alternative_representations():
     # Datetime string with timestamp
     assert normalize_sheet_date("06/10/2026 10:41:04") == date(2026, 10, 6)
     assert normalize_sheet_date("06/10/26 10:41:04") == date(2026, 10, 6)
+    assert normalize_sheet_date("2026-10-06T10:41:04") == date(2026, 10, 6)
+    assert normalize_sheet_date("2026-10-06T10:41:04Z") == date(2026, 10, 6)
+    # Dot separated formats
+    assert normalize_sheet_date("06.10.26") == date(2026, 10, 6)
+    assert normalize_sheet_date("06.10.2026") == date(2026, 10, 6)
+
+
+def test_ambiguous_dates_interpreted_as_indian_format():
+    """Verify that ambiguous DD/MM dates are interpreted as DD/MM (Indian format), not MM/DD (US format)."""
+    # 06/10/26 must be 6 October 2026, NOT 10 June 2026
+    assert normalize_sheet_date("06/10/26") == date(2026, 10, 6)
+    assert normalize_sheet_date("06/10/2026") == date(2026, 10, 6)
+    # 01/02/26 must be 1 February 2026, NOT 2 January 2026
+    assert normalize_sheet_date("01/02/26") == date(2026, 2, 1)
+    assert normalize_sheet_date("01/02/2026") == date(2026, 2, 1)
+    # 11/12/26 must be 11 December 2026, NOT 12 November 2026
+    assert normalize_sheet_date("11/12/26") == date(2026, 12, 11)
+    assert normalize_sheet_date("11/12/2026") == date(2026, 12, 11)
+    # 05/04/26 must be 5 April 2026, NOT 4 May 2026
+    assert normalize_sheet_date("05/04/26") == date(2026, 4, 5)
+    # Dash-separated ambiguous dates
+    assert normalize_sheet_date("06-10-26") == date(2026, 10, 6)
+    assert normalize_sheet_date("01-02-26") == date(2026, 2, 1)
+    # Unambiguous dates (> 12 day)
+    assert normalize_sheet_date("25/10/26") == date(2026, 10, 25)
+    assert normalize_sheet_date("25/10/2026") == date(2026, 10, 25)
+    # None and empty
+    assert normalize_sheet_date(None) is None
+    assert normalize_sheet_date("") is None
+    assert normalize_sheet_date("invalid-date") is None
 
 
 # -------------------------------------------------------------------------

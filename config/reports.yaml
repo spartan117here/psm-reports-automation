@@ -126,3 +126,33 @@ reports:
       - "PAID INS"
     target_sheet_tab_prefix: "October - 2026"
     deduplication_key: "REDEMNO"
+
+# ==============================================================================
+# Screenshot Generation Configurations
+# ==============================================================================
+screenshots:
+  output_dir: "data/screenshots"
+  dpi: 200
+  padding: 20
+  targets:
+    enrollment:
+      target_id: "enrollment"
+      display_name: "Enrollment Report (Consolidated & Achieved Count)"
+      workbook_env_key: "GOOGLE_SHEET_NEW_ENROLLMENT_ID"
+      workbook_name: "New Enrollment from April 2026"
+      worksheet_name: "Consolidate Report - Oct"
+      candidate_range: "E3:M31"
+      validated_range: "E3:L30"
+      title_pattern: "New Enrollment as on"
+      filename_prefix: "enrollment_report"
+    closing:
+      target_id: "closing"
+      display_name: "Closing Report (Scheme Rejoining Summary)"
+      workbook_env_key: "GOOGLE_SHEET_CLOSED_REJOINING_ID"
+      workbook_name: "Closed Member & Rejoining Report"
+      worksheet_name: "October - 2026"
+      candidate_range: "K2:P12"
+      validated_range: "L3:Q14"
+      title_pattern: "SCHEME REJOINING REPORT AS ON"
+      filename_prefix: "closing_rejoining_report"
+
