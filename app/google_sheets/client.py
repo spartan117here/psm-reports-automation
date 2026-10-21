@@ -75,6 +75,11 @@ class GoogleSheetsService(ABC):
         pass
 
     @abstractmethod
+    def batch_update(self, spreadsheet_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a batchUpdate request against spreadsheet metadata or formatting."""
+        pass
+
+    @abstractmethod
     def export_pdf(
         self, spreadsheet_id: str, gid: Any, range_name: Optional[str] = None
     ) -> bytes:
@@ -126,14 +131,16 @@ class MockGoogleSheetsService(GoogleSheetsService):
         try:
             import pymupdf
             doc = pymupdf.open()
-            page = doc.new_page(width=612, height=792)
-            content = f"Mock Sheet (gid: {gid})\nRange: {range_name or 'Full Sheet'}\n"
-            # Add any mocked rows
+            page = doc.new_page(width=792, height=1008)  # Clean portrait canvas
+            content = f"Mock Sheet (gid: {gid})\nRange: {range_name or 'Full Sheet'}\n\n"
+            # Add mocked rows for this spreadsheet
             for k, rows in self.sheets.items():
-                if range_name and (range_name in k or str(gid) in k or "October" in k or "Consolidate" in k):
+                if k.startswith(f"{spreadsheet_id}:"):
                     for r in rows:
-                        content += " ".join(str(cell) for cell in r) + "\n"
-            page.insert_text((72, 72), content)
+                        line = "  ".join(str(cell) for cell in r if str(cell).strip())
+                        if line.strip():
+                            content += line + "\n"
+            page.insert_text((36, 36), content, fontsize=8)
             return doc.tobytes()
         except Exception as e:
             logger.warning(f"Failed to generate synthetic PDF: {e}")
@@ -197,6 +204,9 @@ class MockGoogleSheetsService(GoogleSheetsService):
     def ensure_grid_capacity(self, spreadsheet_id: str, tab_name: str, required_rows: int) -> None:
         pass
 
+    def batch_update(self, spreadsheet_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        return {"spreadsheetId": spreadsheet_id, "replies": []}
+
 
 class GoogleApiSheetsService(GoogleSheetsService):
     """
@@ -214,8 +224,16 @@ class GoogleApiSheetsService(GoogleSheetsService):
         service_account_json: Optional[str] = None,
         read_only: bool = True,
     ):
-        self.read_only = read_only
-        self.scopes = DEFAULT_SCOPES if read_only else READ_WRITE_SCOPES
+        env_strict = os.getenv("STRICT_READ_ONLY", "").lower() in ("true", "1", "yes")
+        if env_strict:
+            self.read_only = True
+            logger.info("STRICT_READ_ONLY environment flag detected. Read-only mode permanently enforced.")
+        else:
+            self.read_only = read_only
+
+        self.scopes = DEFAULT_SCOPES if self.read_only else READ_WRITE_SCOPES
+        if self.read_only:
+            logger.info("Google Sheets Client initialized in READ-ONLY mode. All write methods are disabled.")
         self.service = self._init_service(service_account_path, service_account_json)
 
     def _init_service(
@@ -354,7 +372,7 @@ class GoogleApiSheetsService(GoogleSheetsService):
 
     def append_rows(self, spreadsheet_id: str, range_name: str, values: List[List[Any]]) -> int:
         """Append rows to a target sheet/range."""
-        if self.read_only:
+        if self.read_only or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
             raise GoogleSheetsError("Cannot append rows: service is initialized in READ-ONLY mode.")
         try:
             body = {"values": values}
@@ -379,7 +397,7 @@ class GoogleApiSheetsService(GoogleSheetsService):
 
     def update_range(self, spreadsheet_id: str, range_name: str, values: List[List[Any]]) -> bool:
         """Update a specific range of cells."""
-        if self.read_only:
+        if self.read_only or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
             raise GoogleSheetsError("Cannot update cells: service is initialized in READ-ONLY mode.")
         try:
             body = {"values": values}
@@ -397,7 +415,7 @@ class GoogleApiSheetsService(GoogleSheetsService):
 
     def clear_range(self, spreadsheet_id: str, range_name: str) -> bool:
         """Clear cell contents from a specific range."""
-        if self.read_only:
+        if self.read_only or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
             raise GoogleSheetsError("Cannot clear cells: service is initialized in READ-ONLY mode.")
         try:
             self.service.spreadsheets().values().clear(
@@ -423,9 +441,25 @@ class GoogleApiSheetsService(GoogleSheetsService):
                 values.add(str(r[0]).strip())
         return values
 
+    def batch_update(self, spreadsheet_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a batchUpdate request against spreadsheet metadata or formatting."""
+        if self.read_only or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            raise GoogleSheetsError("Cannot execute batchUpdate: service is initialized in READ-ONLY mode.")
+        try:
+            return (
+                self.service.spreadsheets()
+                .batchUpdate(spreadsheetId=spreadsheet_id, body=body)
+                .execute()
+            )
+        except Exception as e:
+            raise GoogleSheetsError(
+                f"Failed to execute batchUpdate in spreadsheet '{spreadsheet_id}': {e}"
+            ) from e
+
     def ensure_grid_capacity(self, spreadsheet_id: str, tab_name: str, required_rows: int) -> None:
         """Ensure worksheet grid dimension has at least required_rows capacity."""
-        if self.read_only:
+        if self.read_only or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            logger.info(f"Read-only mode active: grid capacity mutation skipped for '{tab_name}'.")
             return
         meta = self.get_spreadsheet_metadata(spreadsheet_id)
         sheet_meta = None
@@ -450,14 +484,7 @@ class GoogleApiSheetsService(GoogleSheetsService):
                     }
                 ]
             }
-            try:
-                self.service.spreadsheets().batchUpdate(
-                    spreadsheetId=spreadsheet_id, body=body
-                ).execute()
-                logger.info(
-                    f"Expanded grid capacity for '{tab_name}' from {current_rows} to {required_rows} rows."
-                )
-            except Exception as e:
-                raise GoogleSheetsError(
-                    f"Failed to expand grid rows for '{tab_name}' in spreadsheet '{spreadsheet_id}': {e}"
-                ) from e
+            self.batch_update(spreadsheet_id=spreadsheet_id, body=body)
+            logger.info(
+                f"Expanded grid capacity for '{tab_name}' from {current_rows} to {required_rows} rows."
+            )

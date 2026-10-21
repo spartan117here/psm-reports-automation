@@ -38,8 +38,11 @@ venv.bak/
 *.pfx
 secrets/
 credentials/
-service_account.json
-oauth_credentials.json
+service_account*.json
+oauth_credentials*.json
+*token*.json
+*credentials*.json
+*.secret
 
 # IDE & Editor Files
 .vscode/
@@ -62,9 +65,13 @@ logs/*.jsonl
 data/raw/*
 data/processed/*
 data/runs/*
+data/screenshots/*
+data/delivery/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/runs/.gitkeep
+!data/screenshots/.gitkeep
+!data/delivery/.gitkeep
 
 # Temporary / Scratch
 tmp/

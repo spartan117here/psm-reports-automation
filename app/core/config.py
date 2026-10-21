@@ -46,12 +46,32 @@ class AppSettings(BaseModel):
     environment: str = "development"
 
 
+class WhatsAppConfig(BaseModel):
+    enabled: bool = False
+    api_provider: str = "meta_cloud_api"
+    dry_run: bool = True
+    rate_limit_per_minute: int = 20
+    default_recipients: List[str] = Field(default_factory=list)
+    recipient: Optional[str] = None
+    phone_number_id: Optional[str] = None
+    api_token: Optional[str] = None
+    api_version: str = "v21.0"
+    delivery_mode: str = "template"  # "template" (Meta business-initiated) or "session" (free-form media)
+    template_enrollment_name: Optional[str] = "psm_enrollment_report"
+    template_closing_name: Optional[str] = "psm_closing_report"
+    template_name: Optional[str] = None
+    template_language: str = "en_US"
+    timeout_seconds: int = 30
+    history_file: Path = Path("data/delivery/delivery_history.json")
+
+
 class AppConfig(BaseModel):
     app: AppSettings = Field(default_factory=AppSettings)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     validation_policy: ValidationPolicyConfig = Field(default_factory=ValidationPolicyConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
+    whatsapp: WhatsAppConfig = Field(default_factory=WhatsAppConfig)
 
     @property
     def name(self) -> str:
@@ -146,6 +166,7 @@ class MappingsConfig(BaseModel):
     showroom_codes: List[str] = Field(default_factory=list)
     special_locations: Dict[str, str] = Field(default_factory=dict)
     location_naming: Dict[str, LocationNamingConfig] = Field(default_factory=dict)
+    employee_registry_path: str = "config/employee_mapping.json"
 
 
 class TargetsConfig(BaseModel):
@@ -208,6 +229,33 @@ def load_config(project_root: Optional[Path] = None) -> AppConfigBundle:
     # Support environment variable override for base URL
     if os.getenv("INNERVEX_BASE_URL"):
         innervex_data.setdefault("innervex", {})["base_url"] = os.getenv("INNERVEX_BASE_URL")
+
+    # Support WhatsApp environment variable overrides
+    if "whatsapp" not in app_data:
+        app_data["whatsapp"] = {}
+    wa_data = app_data["whatsapp"]
+    if os.getenv("WHATSAPP_ENABLED") is not None:
+        wa_data["enabled"] = os.getenv("WHATSAPP_ENABLED", "").lower() in ("true", "1", "yes")
+    if os.getenv("WHATSAPP_DRY_RUN") is not None:
+        wa_data["dry_run"] = os.getenv("WHATSAPP_DRY_RUN", "").lower() in ("true", "1", "yes")
+    if os.getenv("WHATSAPP_RECIPIENT"):
+        wa_data["recipient"] = os.getenv("WHATSAPP_RECIPIENT")
+    if os.getenv("WHATSAPP_PHONE_NUMBER_ID"):
+        wa_data["phone_number_id"] = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+    if os.getenv("WHATSAPP_API_TOKEN"):
+        wa_data["api_token"] = os.getenv("WHATSAPP_API_TOKEN")
+    if os.getenv("WHATSAPP_DELIVERY_MODE"):
+        wa_data["delivery_mode"] = os.getenv("WHATSAPP_DELIVERY_MODE")
+    if os.getenv("WHATSAPP_ENROLLMENT_TEMPLATE"):
+        wa_data["template_enrollment_name"] = os.getenv("WHATSAPP_ENROLLMENT_TEMPLATE")
+    if os.getenv("WHATSAPP_CLOSING_TEMPLATE"):
+        wa_data["template_closing_name"] = os.getenv("WHATSAPP_CLOSING_TEMPLATE")
+    if os.getenv("WHATSAPP_TEMPLATE_NAME"):
+        wa_data["template_name"] = os.getenv("WHATSAPP_TEMPLATE_NAME")
+    if os.getenv("WHATSAPP_TEMPLATE_LANGUAGE"):
+        wa_data["template_language"] = os.getenv("WHATSAPP_TEMPLATE_LANGUAGE")
+    if os.getenv("WHATSAPP_API_VERSION"):
+        wa_data["api_version"] = os.getenv("WHATSAPP_API_VERSION")
 
     app_config = AppConfig(**app_data)
     innervex_config = InnervexConfig(**innervex_data.get("innervex", {}))

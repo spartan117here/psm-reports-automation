@@ -63,6 +63,10 @@ class SheetWriter:
         # 3. Append unique rows
         appended = 0
         if to_append:
+            from app.core.exceptions import GoogleSheetsError
+            from app.google_sheets.client import GoogleApiSheetsService
+            if getattr(self.service, "read_only", None) is True or (isinstance(self.service, GoogleApiSheetsService) and os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes")):
+                raise GoogleSheetsError(f"Cannot append rows to '{tab_name}': service is initialized in READ-ONLY mode.")
             appended = self.service.append_rows(spreadsheet_id, f"{tab_name}!A:N", to_append)
             logger.info(
                 f"Appended {appended} rows to '{tab_name}' (skipped {skipped} existing duplicate keys)."
@@ -196,6 +200,12 @@ class SheetWriter:
                 appended_count=len(records_to_append),
                 skipped_duplicates_count=reconciliation_result.already_present_count,
             )
+
+        # Fail closed if live execution is attempted under read-only mode
+        from app.google_sheets.client import GoogleApiSheetsService
+        import os
+        if getattr(self.service, "read_only", None) is True or (isinstance(self.service, GoogleApiSheetsService) and os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes")):
+            raise GoogleSheetsError(f"Cannot append records to '{tab_name}': service is initialized in READ-ONLY mode.")
 
         # 7. Live execution: Determine append row boundary
         existing_rows = self.service.read_range(spreadsheet_id, f"{tab_name}!D:D")

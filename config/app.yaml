@@ -39,3 +39,20 @@ security:
     - "cookie"
     - "authorization"
     - "auth"
+
+whatsapp:
+  enabled: false  # STRICTLY DISABLED by default. Requires executive authorization.
+  api_provider: "meta_cloud_api"
+  dry_run: true   # Safe simulation mode (zero external requests)
+  rate_limit_per_minute: 20
+  recipient: ""   # Single configured recipient phone number (e.g. "+919840123456")
+  phone_number_id: ""  # Meta WhatsApp Cloud API Phone Number ID
+  api_version: "v21.0"
+  delivery_mode: "template"  # "template" (Meta business-initiated) or "session" (free-form media in 24h window)
+  template_enrollment_name: "psm_enrollment_report"  # Template for Enrollment Report image
+  template_closing_name: "psm_closing_report"        # Template for Closing Report image
+  template_language: "en_US"
+  timeout_seconds: 30
+  history_file: "data/delivery/delivery_history.json"
+
+

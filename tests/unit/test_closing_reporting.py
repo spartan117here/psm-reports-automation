@@ -627,3 +627,88 @@ def test_zero_writes_on_idempotency_detection():
     after_row_count = len(mock_service.read_range("SID", f"{tab}!A1:G"))
     assert after_row_count == initial_row_count  # Strictly unchanged!
 
+
+# -------------------------------------------------------------------------
+# 29. Regression: CPT Reconciliation with Multi-Table Scheme Breakdowns
+# -------------------------------------------------------------------------
+def test_read_summary_and_pivot_values_with_scheme_breakdown_tables():
+    """
+    Regression test for RUN-20261021-104008 failure:
+    Ensures that when a destination sheet contains both the main summary/pivot
+    tables and secondary scheme breakdown tables (where CPT has 291 Subhiksham
+    + 1 Flexi = 292 SS closures, plus 78 Viruksham = 370 total closures):
+    1. closed_values correctly reads the main summary table CLOSED (370),
+       not the SS closure count (292) from the secondary breakdown.
+    2. pivot_values correctly reads the main pivot COUNTA of SCHEMENAME (370),
+       not the single-column scheme count (291) from the secondary pivot.
+    """
+    mock_service = MockGoogleSheetsService()
+    tab = "October - 2026"
+
+    # Multi-table layout mimicking production October - 2026 K1:Z50
+    # Table 1: Main Summary Table (Row 4: SHOWROOM (L), CLOSED (M))
+    # Table 2: Closed Count Table (Row 16: SHOWROOM (O), SS (P))
+    # Table 3: Main Pivot Table (Row 18: SHOWROOM (S), COUNTA of SCHEMENAME (T))
+    # Table 4: Secondary Pivot Table by Scheme (Row 35: SHOWROOM (S), NEW SWARNA SUBHIKSHAM (T), FLEXI (U), VIRUKSHAM (V))
+    summary_grid = [
+        [""] * 16 for _ in range(50)
+    ]
+    # Row 4 (1-based row 4, 0-based idx 3): Col L (idx 1)='SHOWROOM', Col M (idx 2)='CLOSED'
+    summary_grid[3][1] = "SHOWROOM"
+    summary_grid[3][2] = "CLOSED"
+    summary_grid[4][1] = "CPT"
+    summary_grid[4][2] = "370"
+    summary_grid[5][1] = "CBE"
+    summary_grid[5][2] = "270"
+    summary_grid[6][1] = "TOTAL"
+    summary_grid[6][2] = "640"
+
+    # Row 16 (0-based idx 15): Col O (idx 4)='SHOWROOM', Col P (idx 5)='SS'
+    summary_grid[15][4] = "SHOWROOM"
+    summary_grid[15][5] = "SS"
+    summary_grid[16][4] = "CPT"
+    summary_grid[16][5] = "292"  # Subhiksham total (291 + 1 flexi)
+    summary_grid[17][4] = "CBE"
+    summary_grid[17][5] = "240"
+
+    # Row 18 (0-based idx 17): Col S (idx 8)='SHOWROOM', Col T (idx 9)='COUNTA of SCHEMENAME'
+    summary_grid[17][8] = "SHOWROOM"
+    summary_grid[17][9] = "COUNTA of SCHEMENAME"
+    summary_grid[18][8] = "CPT"
+    summary_grid[18][9] = "370"
+    summary_grid[19][8] = "CBE"
+    summary_grid[19][9] = "270"
+    summary_grid[20][8] = "Grand Total"
+    summary_grid[20][9] = "640"
+
+    # Row 35 (0-based idx 34): Secondary pivot broken down by scheme
+    summary_grid[33][8] = "COUNTA of SCHEMENAME"
+    summary_grid[33][9] = "SCHEMENAME"
+    summary_grid[34][8] = "SHOWROOM"
+    summary_grid[34][9] = "NEW SWARNA SUBHIKSHAM"
+    summary_grid[34][10] = "SWARNA SUBHIKSHAM FLEXI"
+    summary_grid[34][11] = "SWARNA VIRUKSHAM"
+    summary_grid[35][8] = "CPT"
+    summary_grid[35][9] = "291"  # Only Subhiksham
+    summary_grid[35][10] = "1"   # Flexi
+    summary_grid[35][11] = "78"  # Viruksham
+    summary_grid[36][8] = "CBE"
+    summary_grid[36][9] = "240"
+    summary_grid[36][11] = "30"
+
+    mock_service.update_range("SID", f"{tab}!K1:Z50", summary_grid)
+
+    sync = ClosingSheetSync(mock_service, spreadsheet_id="SID")
+    closed_vals, pivot_vals = sync.read_summary_and_pivot_values(tab)
+
+    # Must extract true totals (370), not corrupted breakdown numbers (292 or 291)
+    assert closed_vals["CPT"] == 370
+    assert pivot_vals["CPT"] == 370
+    assert closed_vals["CBE"] == 270
+    assert pivot_vals["CBE"] == 270
+
+    val_res = sync.compare_closed_vs_pivot(closed_vals, pivot_vals)
+    assert val_res.status == "PASS"
+    assert val_res.all_showrooms_matched is True
+
+

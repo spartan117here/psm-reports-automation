@@ -1,0 +1,187 @@
+{
+  "2026-10-16": {
+    "date": "2026-10-16",
+    "subhiksham": {
+      "auto_count": 123,
+      "manual_count": 123,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "viruksham": {
+      "auto_count": 40,
+      "manual_count": 40,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "branch_aggregation": {},
+    "totals": {
+      "subhiksham_amount": {
+        "auto": "671500.0",
+        "manual": "671500.0",
+        "match": true
+      },
+      "viruksham_amount": {
+        "auto": "12829898.0",
+        "manual": "12829898.0",
+        "match": true
+      }
+    },
+    "closing": {
+      "raw_count": 146,
+      "cleaned_count": 146,
+      "rejected_count": 0
+    }
+  },
+  "2026-10-17": {
+    "date": "2026-10-17",
+    "subhiksham": {
+      "auto_count": 226,
+      "manual_count": 226,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "viruksham": {
+      "auto_count": 49,
+      "manual_count": 49,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "branch_aggregation": {},
+    "totals": {
+      "subhiksham_amount": {
+        "auto": "1868000.0",
+        "manual": "1868000.0",
+        "match": true
+      },
+      "viruksham_amount": {
+        "auto": "18187211.0",
+        "manual": "18187211.0",
+        "match": true
+      }
+    },
+    "closing": {
+      "raw_count": 228,
+      "cleaned_count": 228,
+      "rejected_count": 0
+    }
+  },
+  "2026-10-18": {
+    "date": "2026-10-18",
+    "subhiksham": {
+      "auto_count": 237,
+      "manual_count": 237,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "viruksham": {
+      "auto_count": 46,
+      "manual_count": 46,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "branch_aggregation": {},
+    "totals": {
+      "subhiksham_amount": {
+        "auto": "1557500.0",
+        "manual": "1557500.0",
+        "match": true
+      },
+      "viruksham_amount": {
+        "auto": "15816307.0",
+        "manual": "15816307.0",
+        "match": true
+      }
+    },
+    "closing": {
+      "raw_count": 286,
+      "cleaned_count": 286,
+      "rejected_count": 0
+    }
+  },
+  "2026-10-19": {
+    "date": "2026-10-19",
+    "subhiksham": {
+      "auto_count": 187,
+      "manual_count": 187,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "viruksham": {
+      "auto_count": 31,
+      "manual_count": 31,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "branch_aggregation": {},
+    "totals": {
+      "subhiksham_amount": {
+        "auto": "1494000.0",
+        "manual": "1494000.0",
+        "match": true
+      },
+      "viruksham_amount": {
+        "auto": "10560258.0",
+        "manual": "10560258.0",
+        "match": true
+      }
+    },
+    "closing": {
+      "raw_count": 258,
+      "cleaned_count": 258,
+      "rejected_count": 0
+    }
+  },
+  "2026-10-20": {
+    "date": "2026-10-20",
+    "subhiksham": {
+      "auto_count": 261,
+      "manual_count": 261,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "viruksham": {
+      "auto_count": 43,
+      "manual_count": 43,
+      "count_match": true,
+      "mismatches": [],
+      "msno_diff": {},
+      "field_differences": []
+    },
+    "branch_aggregation": {},
+    "totals": {
+      "subhiksham_amount": {
+        "auto": "1894500.0",
+        "manual": "1894500.0",
+        "match": true
+      },
+      "viruksham_amount": {
+        "auto": "13142440.0",
+        "manual": "13142440.0",
+        "match": true
+      }
+    },
+    "closing": {
+      "raw_count": 103,
+      "cleaned_count": 103,
+      "rejected_count": 0
+    }
+  }
+}

@@ -63,3 +63,7 @@ location_naming:
   sv:
     store_suffix: " SV"         # e.g., "CHROMEPET SV"
     ecomm_suffix: " SV ECOMM"   # e.g., "CHROMEPET SV ECOMM"
+
+# Verified master employee registry file
+employee_registry_path: "config/employee_mapping.json"
+

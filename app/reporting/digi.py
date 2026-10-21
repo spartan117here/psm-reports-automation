@@ -486,6 +486,12 @@ class ConsolidateReportUpdater:
                 dry_run=True,
             )
 
+        # Fail closed if live execution is attempted under read-only mode
+        from app.google_sheets.client import GoogleApiSheetsService
+        if getattr(self.sheets_service, "read_only", None) is True or (isinstance(self.sheets_service, GoogleApiSheetsService) and os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes")):
+            from app.core.exceptions import GoogleSheetsError
+            raise GoogleSheetsError(f"Cannot mutate Consolidate Report '{target_tab}': service is initialized in READ-ONLY mode.")
+
         # STEP 6: DESTINATION UPDATE
         # Clear only I20:J29
         range_data = f"{target_tab}!{DESTINATION_DATA_RANGE}"

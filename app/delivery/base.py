@@ -13,6 +13,8 @@ class DeliveryStatus(str, Enum):
     SENT = "SENT"
     FAILED = "FAILED"
     DISABLED = "DISABLED"
+    SKIPPED = "SKIPPED"
+    DUPLICATE = "DUPLICATE"
 
 
 class DeliveryReceipt(BaseModel):
@@ -22,6 +24,7 @@ class DeliveryReceipt(BaseModel):
     recipient: str
     message_id: Optional[str] = None
     error_message: Optional[str] = None
+    attachments_sent: int = 0
 
 
 class DeliveryChannel(ABC):

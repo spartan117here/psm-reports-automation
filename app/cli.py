@@ -102,6 +102,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     run_repo = FileSystemRunRepository(data_dir)
     report_repo = FileSystemReportRepository(data_dir)
 
+    if not getattr(args, "dry_run", False):
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n[BLOCKED] STRICT READ-ONLY MODE IS ACTIVE. Live enrollment writes are forbidden. Use --dry-run.\n")
+            return 1
+
     # 3. Perform idempotency check
     if config_bundle.app.execution.idempotency_enabled and not args.force:
         if run_repo.is_already_processed(target_date, report_id):
@@ -373,6 +378,13 @@ def cmd_run(args: argparse.Namespace) -> int:
                 "Google Sheets credentials not configured (GOOGLE_SERVICE_ACCOUNT_PATH / "
                 "GOOGLE_SHEET_NEW_ENROLLMENT_ID). Cannot perform live sheet append."
             )
+            run_meta.status = RunStatus.FAILED
+            run_meta.completed_at = datetime.now()
+            run_repo.save_run(run_meta)
+            return 1
+
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n[BLOCKED] STRICT READ-ONLY MODE IS ACTIVE. Live enrollment writes are forbidden. Use --dry-run.\n")
             run_meta.status = RunStatus.FAILED
             run_meta.completed_at = datetime.now()
             run_repo.save_run(run_meta)
@@ -1025,12 +1037,25 @@ def cmd_digi_sync(args: argparse.Namespace) -> int:
         DIGI_BRANCH_ORDER,
         DigiReportProcessor,
         calculate_report_date,
+        derive_consolidation_tab_name,
     )
 
     load_config()
     target_date = parse_target_date(args.report_date) if args.report_date else calculate_report_date()
+
+    if not getattr(args, "dry_run", False) and not getattr(args, "mock", False):
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n[BLOCKED] STRICT READ-ONLY MODE IS ACTIVE. Live DigiGold/DigiSilver writes are forbidden. Use --dry-run or --mock.\n")
+            return 1
     digi_sid = getattr(args, "digi_spreadsheet_id", None) or os.getenv("GOOGLE_SHEET_DIGI_ID", DEFAULT_DIGI_SPREADSHEET_ID)
     dest_sid = getattr(args, "spreadsheet_id", None) or os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID")
+
+    if getattr(args, "mock", False):
+        mode_display = "MOCK / OFFLINE (Simulated Data & Zero Writes)"
+    elif getattr(args, "dry_run", False):
+        mode_display = "DRY RUN (Read & Validate Only)"
+    else:
+        mode_display = "LIVE UPDATE"
 
     print("=" * 65)
     print("DIGIGOLD + DIGISILVER CONSOLIDATE REPORT SYNCHRONIZATION")
@@ -1038,11 +1063,35 @@ def cmd_digi_sync(args: argparse.Namespace) -> int:
     print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
     print(f"Digi Workbook ID:   {redact_spreadsheet_id(digi_sid)}")
     print(f"Dest Workbook ID:   {redact_spreadsheet_id(dest_sid or '')}")
-    print(f"Mode:               {'DRY RUN (Read & Validate Only)' if getattr(args, 'dry_run', False) else 'LIVE UPDATE'}")
+    print(f"Mode:               {mode_display}")
     print("=" * 65)
 
     if getattr(args, "mock", False):
-        print("Mock mode requested.")
+        dest_tab = derive_consolidation_tab_name(target_date)
+        divisor = max(1, target_date.day)
+        mock_gold = {"NELLAI": 18, "CHROMEPET": 34, "TRIVANDRUM": 9, "TRICHY": 21, "COIMBATORE": 27, "SALEM": 14, "POONAMALLEE": 12, "PADI": 29, "KANCHEEPURAM": 11, "ECOMMERCE": 8}
+        mock_silver = {"NELLAI": 12, "CHROMEPET": 22, "TRIVANDRUM": 5, "TRICHY": 15, "COIMBATORE": 19, "SALEM": 9, "POONAMALLEE": 8, "PADI": 18, "KANCHEEPURAM": 7, "ECOMMERCE": 4}
+
+        print("\n--- SYNCHRONIZATION RESULTS (MOCK / SIMULATED) ---")
+        print("SERVICE ACCOUNT ACCESS:      PASS (MOCK / OFFLINE)")
+        print("OCT READ:                    PASS (MOCK SIMULATION)")
+        print("OCT PIVOT READ:              PASS (MOCK SIMULATION)")
+        print(f"REPORT DATE:                 {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+        print("\nSimulated Achieved Count values [MOCK / SYNTHETIC DATA]:")
+        print(f"  {'Row':<5}{'Branch':<15}{'DigiGold (I)':>14}{'DigiSilver (J)':>16}")
+        for i, branch in enumerate(DIGI_BRANCH_ORDER):
+            row_num = 20 + i
+            print(f"  {row_num:<5}{branch:<15}{mock_gold.get(branch, 0):>14}{mock_silver.get(branch, 0):>16}")
+
+        print(f"\nDESTINATION TAB:             {dest_tab}")
+        print(f"DESTINATION TITLE:           New Enrollment as on {target_date.strftime('%d/%m/%Y')}")
+        print(f"AVG DIVISOR:                 /{divisor}")
+        print(f"ACTUAL GOOGLE SHEETS WRITES: 0 (MOCK MODE)")
+        print(f"SIMULATED ROWS:              10")
+        print(f"CELLS CLEARED:               0 (Simulated: {dest_tab}!I20:J29)")
+        print(f"CELLS UPDATED:               0 (Simulated: {dest_tab}!I20:J29, L20:L30, E3)")
+        print(f"POST-WRITE VERIFICATION:     PASS (MOCK SIMULATION)")
+        print("OVERALL RESULT:              PASS (MOCK SIMULATION COMPLETE - ZERO WRITES)")
         return 0
 
     sa_path = getattr(args, "service_account", None) or os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -1082,6 +1131,11 @@ def cmd_digi_sync(args: argparse.Namespace) -> int:
         print("OVERALL RESULT: FAIL")
         return 1
 
+    if not getattr(args, "dry_run", False) and not getattr(args, "mock", False):
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n[BLOCKED] STRICT READ-ONLY MODE IS ACTIVE. Live DigiGold/DigiSilver writes are forbidden. Use --dry-run or --mock.\n")
+            return 1
+
     processor = DigiReportProcessor(
         source_service=source_svc,
         dest_service=dest_svc,
@@ -1097,10 +1151,10 @@ def cmd_digi_sync(args: argparse.Namespace) -> int:
         return 1
 
     print("\n--- SYNCHRONIZATION RESULTS ---")
-    print("SERVICE ACCOUNT ACCESS: PASS")
-    print("OCT READ: PASS")
-    print("OCT PIVOT READ: PASS")
-    print(f"REPORT DATE: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+    print("SERVICE ACCOUNT ACCESS:      PASS")
+    print("OCT READ:                    PASS")
+    print("OCT PIVOT READ:              PASS")
+    print(f"REPORT DATE:                 {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
     print("\nCopied Achieved Count values:")
     print(f"  {'Row':<5}{'Branch':<15}{'DigiGold (I)':>14}{'DigiSilver (J)':>16}")
     for i, branch in enumerate(DIGI_BRANCH_ORDER):
@@ -1109,13 +1163,22 @@ def cmd_digi_sync(args: argparse.Namespace) -> int:
             f"  {row_num:<5}{branch:<15}"
             f"{result.gold_values[branch]:>14}{result.silver_values[branch]:>16}"
         )
-    print(f"\nDESTINATION TAB: {result.destination_tab}")
-    print(f"DESTINATION TITLE: {result.report_title}")
-    print(f"AVG DIVISOR: /{result.avg_divisor}")
-    print(f"CELLS CLEARED: {', '.join(result.cells_cleared) or 'None (Dry Run)'}")
-    print(f"CELLS UPDATED: {', '.join(result.cells_updated)}")
-    print(f"POST-WRITE VERIFICATION: {'PASS' if result.verified else 'SKIPPED'}")
-    print("OVERALL RESULT: PASS")
+    print(f"\nDESTINATION TAB:             {result.destination_tab}")
+    print(f"DESTINATION TITLE:           {result.report_title}")
+    print(f"AVG DIVISOR:                 /{result.avg_divisor}")
+    if getattr(args, "dry_run", False):
+        print(f"ACTUAL GOOGLE SHEETS WRITES: 0 (DRY RUN)")
+        print(f"PLANNED ROWS:                10")
+        print(f"CELLS CLEARED:               0 (Dry Run)")
+        print(f"CELLS UPDATED:               0 (Dry Run)")
+        print(f"POST-WRITE VERIFICATION:     PASS (DRY RUN)")
+        print("OVERALL RESULT:              PASS (DRY RUN COMPLETE - ZERO WRITES)")
+    else:
+        print(f"ACTUAL GOOGLE SHEETS WRITES: 10")
+        print(f"CELLS CLEARED:               {', '.join(result.cells_cleared) or 'None'}")
+        print(f"CELLS UPDATED:               {', '.join(result.cells_updated)}")
+        print(f"POST-WRITE VERIFICATION:     {'PASS' if result.verified else 'SKIPPED'}")
+        print("OVERALL RESULT:              PASS")
     return 0
 
 
@@ -1139,10 +1202,22 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
 
     config_bundle = load_config()
     target_date = parse_target_date(args.report_date) if args.report_date else calculate_yesterday_date()
+
+    if not getattr(args, "dry_run", False) and not getattr(args, "mock", False):
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n[BLOCKED] STRICT READ-ONLY MODE IS ACTIVE. Live closing summary writes are forbidden. Use --dry-run or --mock.\n")
+            return 1
     spreadsheet_id = (
         getattr(args, "spreadsheet_id", None)
         or os.getenv("GOOGLE_SHEET_CLOSED_REJOINING_ID", DEFAULT_CLOSED_REJOINING_SPREADSHEET_ID)
     )
+
+    if getattr(args, "mock", False):
+        mode_str = "MOCK / OFFLINE (Simulated Data & Zero Writes)"
+    elif getattr(args, "dry_run", False):
+        mode_str = "DRY RUN (Simulate & Validate Only)"
+    else:
+        mode_str = "LIVE UPDATE"
 
     print("=" * 65)
     print("SCHEME CLOSING REPORT SYNCHRONIZATION")
@@ -1150,7 +1225,7 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
     print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
     print(f"Destination Sheet:  {redact_spreadsheet_id(spreadsheet_id)}")
     print(f"Destination Tab:    {derive_closing_tab_name(target_date)}")
-    print(f"Mode:               {'DRY RUN (Simulate & Validate Only)' if getattr(args, 'dry_run', False) else 'LIVE UPDATE'}")
+    print(f"Mode:               {mode_str}")
     print("=" * 65)
 
     # 1. Establish Innervex Session
@@ -1192,7 +1267,8 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
     if getattr(args, "mock", False):
         print("Using MockGoogleSheetsService (Offline / Mock Mode)")
         sheets_service = MockGoogleSheetsService()
-        seed_mock_closing_sheet(sheets_service, spreadsheet_id, target_date=target_date)
+        include_target = getattr(args, "seed_include_target_date", False)
+        seed_mock_closing_sheet(sheets_service, spreadsheet_id, target_date=target_date, include_target_date=include_target)
     else:
         try:
             sheets_service = GoogleApiSheetsService(
@@ -1208,7 +1284,7 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
                 print(f"Live Sheet Access Note: {type(e).__name__}: {e}")
                 print("Falling back to safe in-memory simulation service seeded with production sheet schema.")
                 sheets_service = MockGoogleSheetsService()
-                seed_mock_closing_sheet(sheets_service, spreadsheet_id, target_date=target_date)
+                seed_mock_closing_sheet(sheets_service, spreadsheet_id, target_date=target_date, include_target_date=False)
             else:
                 print(f"Google Service Account Access: FAIL ({e})")
                 return 1
@@ -1220,11 +1296,17 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
         spreadsheet_id=spreadsheet_id,
     )
 
+    if not getattr(args, "dry_run", False) and not getattr(args, "mock", False):
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n[BLOCKED] STRICT READ-ONLY MODE IS ACTIVE. Live closing summary writes are forbidden. Use --dry-run or --mock.\n")
+            return 1
+
     try:
         result = processor.run(
             report_date=target_date,
             dry_run=getattr(args, "dry_run", False),
             force=getattr(args, "force", False),
+            mock=getattr(args, "mock", False),
         )
     except Exception as e:
         print(f"\nCLOSING REPORT PROCESSING FAILED: {type(e).__name__}: {e}")
@@ -1252,6 +1334,9 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
     if result.processed_csv_path:
         print(f"  Cleaned CSV Saved:         {result.processed_csv_path}")
 
+    is_mock = getattr(args, "mock", False) or getattr(result, "mock", False)
+    is_dry = getattr(args, "dry_run", False) or getattr(result, "dry_run", False)
+
     print("\nDESTINATION TARGET:")
     print(f"  Workbook:                  Closed Member & Rejoining Report")
     print(f"  Sheet Tab:                 {result.destination_tab}")
@@ -1259,22 +1344,44 @@ def cmd_closing_sync(args: argparse.Namespace) -> int:
     print(f"  Append Start Row:          {result.append_start_row}")
     print(f"  Append End Row:            {result.append_end_row}")
     print(f"  Formula Range (H:I):       {result.formula_range}")
-    print(f"  Writes Performed:          {'0 (DRY RUN)' if result.dry_run else result.cleaned_rows_count}")
+    if is_mock:
+        print(f"  Actual Google Sheets Writes: 0 (MOCK MODE)")
+        print(f"  Simulated Rows:            {0 if result.already_processed else result.cleaned_rows_count}")
+        print(f"  Writes Performed:          {'0 (Idempotent Skip)' if result.already_processed else f'0 (MOCK SIMULATION - {result.cleaned_rows_count} rows simulated)'}")
+    elif is_dry:
+        print(f"  Actual Google Sheets Writes: 0 (DRY RUN)")
+        print(f"  Planned Rows:              {0 if result.already_processed else result.cleaned_rows_count}")
+        print(f"  Writes Performed:          {'0 (Idempotent Skip)' if result.already_processed else '0 (DRY RUN)'}")
+    else:
+        print(f"  Actual Google Sheets Writes: {0 if result.already_processed else result.cleaned_rows_count}")
+        print(f"  Writes Performed:          {0 if result.already_processed else result.cleaned_rows_count}")
 
-    print("\nSHOWROOM MAPPING & VALUE VALIDATION (CLOSED vs COUNTA of SCHEMENAME):")
+    tag = " [MOCK / SYNTHETIC DATA]" if (is_mock or getattr(result.validation, "is_synthetic", False)) else ""
+    print(f"\nSHOWROOM MAPPING & VALUE VALIDATION (CLOSED vs COUNTA of SCHEMENAME){tag}:")
     print("-" * 65)
     print(f"  {'Showroom':<12} | {'CLOSED':<8} | {'COUNTA Pivot':<14} | {'Status':<8}")
     print("-" * 65)
-    for comp in result.validation.comparisons:
-        status_str = "MATCH" if comp.matched else f"DIFF ({comp.difference})"
-        print(f"  {comp.showroom:<12} | {comp.closed_value:<8} | {comp.pivot_value:<14} | {status_str:<8}")
+    if not result.validation.comparisons:
+        if result.already_processed:
+            print("  [IDEMPOTENT SKIP] Showroom reconciliation skipped: date already processed.")
+        else:
+            print("  [NO DATA] No showroom reconciliation data available.")
+    else:
+        for comp in result.validation.comparisons:
+            status_str = "MATCH" if comp.matched else f"DIFF ({comp.difference})"
+            print(f"  {comp.showroom:<12} | {comp.closed_value:<8} | {comp.pivot_value:<14} | {status_str:<8}")
     print("-" * 65)
 
-    print(f"\nCLOSING REPORT VALIDATION:   {result.validation.status}")
+    status_tag = " (MOCK / SYNTHETIC)" if is_mock else ""
+    print(f"\nCLOSING REPORT VALIDATION:   {result.validation.status}{status_tag}")
     if result.already_processed:
         print("EXECUTION STATUS:            ALREADY_PROCESSED (Idempotent skip)")
+    elif is_mock:
+        print("EXECUTION STATUS:            SUCCESS (MOCK SIMULATION COMPLETE - ZERO WRITES)")
+    elif is_dry:
+        print("EXECUTION STATUS:            SUCCESS (DRY RUN COMPLETE - ZERO WRITES)")
     else:
-        print(f"EXECUTION STATUS:            {'SUCCESS (DRY RUN COMPLETE)' if result.dry_run else 'SUCCESS (APPENDED)'}")
+        print("EXECUTION STATUS:            SUCCESS (APPENDED)")
     print("=" * 65)
     return 0 if result.validation.status == "PASS" else 1
 
@@ -1399,18 +1506,21 @@ def cmd_screenshot(args: argparse.Namespace) -> int:
 
     config_bundle = load_config()
 
-    output_dir = (
-        Path(args.output_dir)
-        if getattr(args, "output_dir", None)
-        else config_bundle.project_root / "data" / "screenshots"
-    )
+    is_mock = getattr(args, "mock", False)
+    if getattr(args, "output_dir", None):
+        output_dir = Path(args.output_dir)
+    elif is_mock:
+        output_dir = config_bundle.project_root / "data" / "screenshots" / "mock"
+    else:
+        output_dir = config_bundle.project_root / "data" / "screenshots"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     sa_path = getattr(args, "service_account", None) or os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
-    if getattr(args, "mock", False):
-        print("Mode: Mock / Offline Mode")
+    if is_mock:
+        print("Mode: Mock / Offline Mode (SYNTHETIC DATA ONLY)")
+        print("NOTICE: Output isolated to mock directory to prevent confusion with production reports.")
         sheets_service = MockGoogleSheetsService()
         seed_mock_screenshot_data(sheets_service, report_date=target_date)
     else:
@@ -1437,11 +1547,13 @@ def cmd_screenshot(args: argparse.Namespace) -> int:
     print(f"Target: {target.upper()}")
     print(f"Output Directory: {output_dir}")
 
+    is_mock = getattr(args, "mock", False)
     results = []
     try:
         if target in ("all", "enrollment"):
             print("\nCapturing Enrollment Report...")
-            res_enrollment = engine.capture_enrollment(expected_date=target_date)
+            fn_enroll = f"mock_enrollment_report_{target_date.strftime('%Y%m%d')}.png" if is_mock else None
+            res_enrollment = engine.capture_enrollment(expected_date=target_date, filename=fn_enroll)
             results.append(res_enrollment)
             print(f"  [OK] Validated Table: '{res_enrollment.report_title}'")
             print(f"  [OK] Exported Range:   {res_enrollment.range_used} (gid: {res_enrollment.gid})")
@@ -1450,7 +1562,8 @@ def cmd_screenshot(args: argparse.Namespace) -> int:
 
         if target in ("all", "closing"):
             print("\nCapturing Closing Report...")
-            res_closing = engine.capture_closing(expected_date=target_date)
+            fn_close = f"mock_closing_rejoining_report_{target_date.strftime('%Y%m%d')}.png" if is_mock else None
+            res_closing = engine.capture_closing(expected_date=target_date, filename=fn_close)
             results.append(res_closing)
             print(f"  [OK] Validated Table: '{res_closing.report_title}'")
             print(f"  [OK] Exported Range:   {res_closing.range_used} (gid: {res_closing.gid})")
@@ -1507,6 +1620,15 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
     print(f"Pipeline Mode:      {mode_str}")
     print("=" * 75)
 
+    if not getattr(args, "dry_run", False) and not getattr(args, "mock", False):
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n" + "!" * 75)
+            print("PIPELINE BLOCKED: STRICT READ-ONLY MODE IS ACTIVE.")
+            print("Execution of live production daily pipeline with Google Sheets mutations is prohibited.")
+            print("Please re-run with --dry-run or --mock flag.")
+            print("!" * 75 + "\n")
+            return 1
+
     # -------------------------------------------------------------------------
     # STAGE 1: SS & SV Enrollment Synchronization
     # -------------------------------------------------------------------------
@@ -1521,7 +1643,10 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
             force=getattr(args, "force", False),
         )
         if getattr(args, "mock", False):
+            print(f"[Stage 1] Mode: MOCK / OFFLINE (SIMULATED DATA)")
             print(f"[Stage 1] Mock simulation for {rep.upper()}: SUCCESS")
+            print(f"  Actual Google Sheets Writes: 0 (MOCK MODE)")
+            print(f"  Simulated Rows:              4 (Synthetic test records)")
         else:
             rc = cmd_run(rep_args)
             if rc != 0:
@@ -1529,7 +1654,8 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
                 print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
                 return 1
 
-    print("\n[PASS] STAGE 1: Enrollment data synchronized successfully.")
+    stage1_status = "SUCCESS (MOCK SIMULATION - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
+    print(f"\n[PASS] STAGE 1: Enrollment data synchronized: {stage1_status}.")
 
     # -------------------------------------------------------------------------
     # STAGE 2: DigiGold & DigiSilver Synchronization
@@ -1550,7 +1676,8 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
         print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
         return 1
 
-    print("\n[PASS] STAGE 2: Digi counts and enrollment title synchronized successfully.")
+    stage2_status = "SUCCESS (MOCK SIMULATION - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
+    print(f"\n[PASS] STAGE 2: Digi counts and enrollment title synchronized: {stage2_status}.")
 
     # -------------------------------------------------------------------------
     # STAGE 3: Scheme Closing Report Synchronization
@@ -1571,7 +1698,8 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
         print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
         return 1
 
-    print("\n[PASS] STAGE 3: Closing report summary synchronized successfully.")
+    stage3_status = "SUCCESS (MOCK SIMULATION - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
+    print(f"\n[PASS] STAGE 3: Closing report summary synchronized: {stage3_status}.")
 
     # -------------------------------------------------------------------------
     # STAGE 4: Verified Screenshot Generation
@@ -1592,10 +1720,113 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
         print("Pipeline HALTED. Delivery blocked to prevent distributing desynchronized reports.")
         return 1
 
+    stage4_status = "SUCCESS (MOCK SCREENSHOTS - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
+    print(f"\n[PASS] STAGE 4: Verified screenshot generation completed: {stage4_status}.")
+
+    # -------------------------------------------------------------------------
+    # STAGE 5: WhatsApp Executive Report Delivery Channel
+    # -------------------------------------------------------------------------
+    print("\n>>> STAGE 5: WHATSAPP EXECUTIVE REPORT DELIVERY")
+    print("-" * 75)
+    from app.delivery.whatsapp import WhatsAppDeliveryChannel, redact_phone_number
+    from app.delivery.base import DeliveryStatus
+
+    config_bundle = load_config()
+    wa_channel = WhatsAppDeliveryChannel(
+        config=config_bundle.app.whatsapp,
+        dry_run=getattr(args, "dry_run", False) or getattr(args, "mock", False),
+    )
+    if not wa_channel.is_enabled():
+        print("[SKIP] STAGE 5: WhatsApp delivery channel is disabled (enabled=false).")
+        print("  Executive screenshot distribution is paused pending management authorization.")
+        print("  Zero external WhatsApp messages sent.")
+    else:
+        recipient = getattr(args, "recipient", None)
+        print("Delivering verified report screenshots to recipient...")
+        receipt = wa_channel.send_daily_screenshots(
+            report_date=target_date,
+            recipient=recipient,
+            force=getattr(args, "force", False),
+            screenshots_dir=getattr(args, "output_dir", None),
+        )
+        masked_recip = redact_phone_number(receipt.recipient)
+        if receipt.status == DeliveryStatus.SENT:
+            mode_desc = "SIMULATED (DRY RUN)" if (wa_channel.dry_run or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes")) else "LIVE DELIVERY"
+            print(f"[PASS] STAGE 5: Delivery successful ({mode_desc})")
+            print(f"  Recipient:        {masked_recip}")
+            print(f"  Message ID:       {receipt.message_id}")
+            print(f"  Attachments Sent: {receipt.attachments_sent}")
+        elif receipt.status == DeliveryStatus.DUPLICATE:
+            print(f"[WARN] STAGE 5: Delivery skipped ({receipt.error_message})")
+        else:
+            print(f"[FAIL] STAGE 5: Delivery failed: {receipt.error_message}")
+            return 1
+
+    mode_tag = " [MOCK / OFFLINE SIMULATION - ZERO PRODUCTION WRITES]" if getattr(args, "mock", False) else ""
     print("\n" + "=" * 75)
-    print("ALL 4 PIPELINE STAGES COMPLETED SUCCESSFULLY FOR TARGET DATE:", target_date.isoformat())
+    print("ALL PIPELINE STAGES COMPLETED SUCCESSFULLY FOR TARGET DATE:", target_date.isoformat() + mode_tag)
     print("=" * 75)
     return 0
+
+
+def cmd_send_whatsapp(args: argparse.Namespace) -> int:
+    """Send generated daily executive report screenshots via WhatsApp delivery channel."""
+    config_bundle = load_config()
+    target_date = parse_target_date(getattr(args, "report_date", None))
+
+    print("=" * 70)
+    print("POTHYS SWARNA MAHAL WHATSAPP REPORT DELIVERY")
+    print("=" * 70)
+    print(f"Report Date:   {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+    dry_run = getattr(args, "dry_run", False) or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes")
+    print(f"Mode:          {'DRY RUN (Simulated)' if dry_run else 'LIVE PRODUCTION'}")
+
+    delivery_mode = getattr(args, "delivery_mode", "template")
+    print(f"Delivery Mode: {delivery_mode.upper()} (Meta Cloud API)")
+
+    from app.delivery.whatsapp import WhatsAppDeliveryChannel, redact_phone_number
+    from app.delivery.base import DeliveryStatus
+
+    channel = WhatsAppDeliveryChannel(
+        config=config_bundle.app.whatsapp,
+        enabled=True if getattr(args, "dry_run", False) else None,
+        dry_run=dry_run,
+        recipient=getattr(args, "recipient", None),
+        delivery_mode=delivery_mode,
+    )
+
+    if not channel.is_enabled():
+        print("\nERROR: WhatsApp delivery channel is disabled (whatsapp.enabled=false).")
+        print("To test delivery safely in dry-run mode, pass --dry-run:")
+        print("  python -m app send-whatsapp --dry-run --report-date 2026-10-20 --recipient +919840123456")
+        return 1
+
+    receipt = channel.send_daily_screenshots(
+        report_date=target_date,
+        recipient=getattr(args, "recipient", None),
+        force=getattr(args, "force", False),
+        screenshots_dir=getattr(args, "output_dir", None),
+    )
+
+    masked_recip = redact_phone_number(receipt.recipient)
+    print("\n" + "-" * 70)
+    print("DELIVERY RESULT")
+    print("-" * 70)
+    print(f"Status:           {receipt.status.value}")
+    print(f"Recipient:        {masked_recip}")
+    print(f"Message ID:       {receipt.message_id or '[NONE]'}")
+    print(f"Attachments Sent: {receipt.attachments_sent}")
+
+    if receipt.status == DeliveryStatus.SENT:
+        print("\nSUCCESS: WhatsApp executive report delivery completed successfully.")
+        return 0
+    elif receipt.status == DeliveryStatus.DUPLICATE:
+        print(f"\nWARNING: {receipt.error_message}")
+        return 0
+    else:
+        print(f"\nFAILURE: {receipt.error_message}")
+        return 1
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1901,6 +2132,53 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to Google Service Account JSON (overrides GOOGLE_SERVICE_ACCOUNT_PATH)",
     )
+    daily_parser.add_argument(
+        "--recipient",
+        type=str,
+        default=None,
+        help="Recipient phone number for WhatsApp delivery (overrides WHATSAPP_RECIPIENT)",
+    )
+
+    # Command: send-whatsapp
+    wa_parser = subparsers.add_parser(
+        "send-whatsapp",
+        help="Deliver generated report screenshots to executive WhatsApp recipient",
+    )
+    wa_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD). Defaults to yesterday.",
+    )
+    wa_parser.add_argument(
+        "--recipient",
+        type=str,
+        default=None,
+        help="Recipient phone number (e.g. +919840123456). Overrides config.",
+    )
+    wa_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate delivery with full validation but zero external network calls",
+    )
+    wa_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass duplicate-send check and re-deliver report",
+    )
+    wa_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory where screenshots are stored (defaults to data/screenshots)",
+    )
+    wa_parser.add_argument(
+        "--delivery-mode",
+        type=str,
+        default="template",
+        choices=["template", "session"],
+        help="WhatsApp delivery mode: 'template' (default for Meta business-initiated) or 'session' (24h window free-form)",
+    )
 
     return parser
 
@@ -1917,6 +2195,8 @@ def main() -> None:
         sys.exit(cmd_run(args))
     elif args.command == "run-daily":
         sys.exit(cmd_daily_pipeline(args))
+    elif args.command == "send-whatsapp":
+        sys.exit(cmd_send_whatsapp(args))
     elif args.command == "validate":
         sys.exit(cmd_validate(args))
     elif args.command == "auth-test":

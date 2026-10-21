@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import AppConfigBundle, load_config
 from app.core.exceptions import GoogleSheetsError, ScreenshotError, TableValidationError
-from app.google_sheets.client import GoogleSheetsService
+from app.google_sheets.client import GoogleSheetsService, MockGoogleSheetsService
 from app.reporting.closing import derive_closing_tab_name, normalize_sheet_date
 from app.reporting.digi import derive_consolidation_tab_name
 from app.reporting.images import pdf_to_cropped_png
@@ -470,7 +470,12 @@ class GoogleSheetsScreenshotEngine:
 
         # Determine output filename
         date_str = validation.report_date.strftime("%Y%m%d") if validation.report_date else "latest"
-        fn = filename or f"enrollment_report_{date_str}.png"
+        is_mock_run = isinstance(self.sheets_service, MockGoogleSheetsService) or "mock" in str(self.output_dir).lower()
+        if filename:
+            fn = f"mock_{filename}" if (is_mock_run and not filename.startswith("mock_")) else filename
+        else:
+            prefix = "mock_" if is_mock_run else ""
+            fn = f"{prefix}enrollment_report_{date_str}.png"
         out_path = self.output_dir / fn
 
         # Render PDF to tightly cropped PNG
@@ -534,7 +539,12 @@ class GoogleSheetsScreenshotEngine:
             ) from e
 
         date_str = validation.report_date.strftime("%Y%m%d") if validation.report_date else "latest"
-        fn = filename or f"closing_rejoining_report_{date_str}.png"
+        is_mock_run = isinstance(self.sheets_service, MockGoogleSheetsService) or "mock" in str(self.output_dir).lower()
+        if filename:
+            fn = f"mock_{filename}" if (is_mock_run and not filename.startswith("mock_")) else filename
+        else:
+            prefix = "mock_" if is_mock_run else ""
+            fn = f"{prefix}closing_rejoining_report_{date_str}.png"
         out_path = self.output_dir / fn
 
         rendered_path, dimensions = pdf_to_cropped_png(
