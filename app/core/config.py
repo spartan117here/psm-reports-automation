@@ -65,6 +65,24 @@ class WhatsAppConfig(BaseModel):
     history_file: Path = Path("data/delivery/delivery_history.json")
 
 
+class TelegramConfig(BaseModel):
+    enabled: bool = False
+    dry_run: bool = True
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+    timeout_seconds: int = 30
+    rate_limit_per_minute: int = 30
+    history_file: Path = Path("data/delivery/telegram_history.json")
+
+
+class DigiScheduleConfig(BaseModel):
+    start_time: str = "11:00"
+    cutoff_time: str = "12:30"
+    retry_interval_minutes: int = 15
+    max_retries: int = 6
+    history_file: Path = Path("data/delivery/digi_validation_history.json")
+
+
 class AppConfig(BaseModel):
     app: AppSettings = Field(default_factory=AppSettings)
     storage: StorageConfig = Field(default_factory=StorageConfig)
@@ -72,6 +90,8 @@ class AppConfig(BaseModel):
     validation_policy: ValidationPolicyConfig = Field(default_factory=ValidationPolicyConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     whatsapp: WhatsAppConfig = Field(default_factory=WhatsAppConfig)
+    telegram: TelegramConfig = Field(default_factory=TelegramConfig)
+    digi_schedule: DigiScheduleConfig = Field(default_factory=DigiScheduleConfig)
 
     @property
     def name(self) -> str:
@@ -256,6 +276,24 @@ def load_config(project_root: Optional[Path] = None) -> AppConfigBundle:
         wa_data["template_language"] = os.getenv("WHATSAPP_TEMPLATE_LANGUAGE")
     if os.getenv("WHATSAPP_API_VERSION"):
         wa_data["api_version"] = os.getenv("WHATSAPP_API_VERSION")
+
+    # Support Telegram environment variable overrides
+    if "telegram" not in app_data:
+        app_data["telegram"] = {}
+    tg_data = app_data["telegram"]
+    if os.getenv("TELEGRAM_ENABLED") is not None:
+        tg_data["enabled"] = os.getenv("TELEGRAM_ENABLED", "").lower() in ("true", "1", "yes")
+    if os.getenv("TELEGRAM_DRY_RUN") is not None:
+        tg_data["dry_run"] = os.getenv("TELEGRAM_DRY_RUN", "").lower() in ("true", "1", "yes")
+    if os.getenv("TELEGRAM_BOT_TOKEN"):
+        tg_data["bot_token"] = os.getenv("TELEGRAM_BOT_TOKEN")
+    if os.getenv("TELEGRAM_CHAT_ID"):
+        tg_data["chat_id"] = str(os.getenv("TELEGRAM_CHAT_ID")).strip()
+    if os.getenv("TELEGRAM_TIMEOUT_SECONDS"):
+        try:
+            tg_data["timeout_seconds"] = int(os.getenv("TELEGRAM_TIMEOUT_SECONDS"))
+        except ValueError:
+            pass
 
     app_config = AppConfig(**app_data)
     innervex_config = InnervexConfig(**innervex_data.get("innervex", {}))

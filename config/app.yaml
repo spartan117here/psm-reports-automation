@@ -55,4 +55,20 @@ whatsapp:
   timeout_seconds: 30
   history_file: "data/delivery/delivery_history.json"
 
+telegram:
+  enabled: false  # STRICTLY DISABLED by default. Requires authorization.
+  dry_run: true   # Safe simulation mode (zero external requests)
+  rate_limit_per_minute: 30
+  chat_id: ""     # Configured personal chat ID (set via TELEGRAM_CHAT_ID in .env)
+  bot_token: ""   # Telegram Bot API token (set via TELEGRAM_BOT_TOKEN in .env)
+  timeout_seconds: 30
+  history_file: "data/delivery/telegram_history.json"
+
+digi_schedule:
+  start_time: "11:00"              # Earliest time to begin Digi validation (HH:MM IST)
+  cutoff_time: "12:30"             # Cutoff time after which Digi validation stops retrying
+  retry_interval_minutes: 15       # Interval between validation attempts
+  max_retries: 6                   # Maximum number of retry attempts before reporting BLOCKED
+  history_file: "data/delivery/digi_validation_history.json"
+
 

@@ -26,6 +26,9 @@ param (
     [ValidateSet("dry-run", "mock", "live")]
     [string]$Mode = "dry-run",
 
+    [ValidateSet("1", "2", "3", "2-3", "all")]
+    [string]$Phase = "all",
+
     [string]$ReportDate = "",
 
     [string]$OutputDir = ""
@@ -59,6 +62,7 @@ Write-Log "================================================================="
 Write-Log "Working Directory: $ProjectRoot"
 Write-Log "Log File:          $LogFile"
 Write-Log "Execution Mode:    $($Mode.ToUpper())"
+Write-Log "Pipeline Phase:    $($Phase.ToUpper())"
 
 # 2. Locate Python Executable
 $PythonExe = (Get-Command "python" -ErrorAction SilentlyContinue).Source
@@ -92,7 +96,7 @@ if ($Mode -eq "live") {
 }
 
 # 4. Construct Command Arguments
-$CliArgs = @("-m", "app", "run-daily")
+$CliArgs = @("-m", "app", "run-daily", "--phase", $Phase)
 
 if ($Mode -eq "dry-run") {
     $CliArgs += "--dry-run"

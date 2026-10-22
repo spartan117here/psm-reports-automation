@@ -24,19 +24,29 @@ Guarantees:
 - Post-write read-back of the cells this step wrote.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+from enum import Enum
+import json
 import logging
 import os
+from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 from pydantic import BaseModel, Field
 
+from app.core.config import DigiScheduleConfig
 from app.core.exceptions import (
     DataValidationError,
     GoogleSheetsError,
 )
 from app.google_sheets.client import GoogleSheetsService
 from app.google_sheets.reconciliation import derive_monthly_tab_name, normalize_amount
+
+try:
+    from zoneinfo import ZoneInfo
+    IST = ZoneInfo("Asia/Kolkata")
+except ImportError:
+    IST = timezone(timedelta(hours=5, minutes=30))
 
 logger = logging.getLogger("pothys_reporting")
 
@@ -56,6 +66,9 @@ DIGI_BRANCH_ORDER: List[str] = [
     "KANCHEEPURAM",
     "ECOMMERCE",
 ]
+
+# Physical showroom branches (excluding ECOMMERCE) for subtotal verification
+SHOWROOM_BRANCHES_9: List[str] = DIGI_BRANCH_ORDER[:9]
 
 # Destination spreadsheet layout constants
 DESTINATION_ROW_START = 20
@@ -117,6 +130,42 @@ class ConsolidateVerificationError(GoogleSheetsError):
     """Raised when post-write verification of the destination Consolidate Report tab fails."""
 
 
+class DigiValidationStatus(str, Enum):
+    """Validation lifecycle status for DigiGold/DigiSilver data source."""
+    SUCCESS = "SUCCESS"
+    PENDING_RETRY = "PENDING_RETRY"
+    TOO_EARLY = "TOO_EARLY"
+    BLOCKED_CUTOFF = "BLOCKED_CUTOFF"
+    STALE_DATA = "STALE_DATA"
+    VALIDATION_FAILED = "VALIDATION_FAILED"
+
+
+class DigiValidationRecord(BaseModel):
+    """Immutable audit record for a single Digi validation attempt."""
+    report_date: date
+    attempt: int
+    timestamp: str
+    status: DigiValidationStatus
+    gold_showroom_subtotal: Optional[int] = None
+    gold_ecommerce_subtotal: Optional[int] = None
+    gold_overall_total: Optional[int] = None
+    silver_showroom_subtotal: Optional[int] = None
+    silver_ecommerce_subtotal: Optional[int] = None
+    silver_overall_total: Optional[int] = None
+    error_message: Optional[str] = None
+
+
+class DigiPivotExtraction(BaseModel):
+    """Extracted raw values and subtotals from Digi pivot tab."""
+    gold_values: Dict[str, int]
+    silver_values: Dict[str, int]
+    gold_showroom_subtotal: Optional[int] = None
+    silver_showroom_subtotal: Optional[int] = None
+    gold_grand_total: Optional[int] = None
+    silver_grand_total: Optional[int] = None
+    pivot_date_header: Optional[date] = None
+
+
 class DigiExtractionResult(BaseModel):
     """Extracted and validated DigiGold + DigiSilver data for a report date."""
     report_date: date
@@ -125,6 +174,194 @@ class DigiExtractionResult(BaseModel):
     source_latest_schdate: Optional[date] = None
     source_record_count_latest_schdate: int = 0
     source_records_for_report_date: int = 0
+    gold_showroom_subtotal: Optional[int] = None
+    silver_showroom_subtotal: Optional[int] = None
+    gold_ecommerce_subtotal: Optional[int] = None
+    silver_ecommerce_subtotal: Optional[int] = None
+    gold_overall_total: Optional[int] = None
+    silver_overall_total: Optional[int] = None
+    pivot_date_header: Optional[date] = None
+
+
+class DigiValidationTracker:
+    """Persistent audit ledger for Digi validation attempts and idempotency."""
+
+    def __init__(self, history_file: Optional[Path] = None):
+        self.history_file = Path(history_file or "data/delivery/digi_validation_history.json")
+
+    def _load(self) -> List[Dict[str, Any]]:
+        if not self.history_file.is_file():
+            return []
+        try:
+            with open(self.history_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("attempts", [])
+        except Exception as e:
+            logger.warning(f"Could not load Digi validation history from {self.history_file}: {e}")
+            return []
+
+    def _save(self, attempts: List[Dict[str, Any]]) -> None:
+        try:
+            self.history_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.history_file, "w", encoding="utf-8") as f:
+                json.dump({"attempts": attempts}, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save Digi validation history: {e}")
+
+    def record_attempt(self, record: DigiValidationRecord) -> None:
+        attempts = self._load()
+        attempts.append(record.model_dump(mode="json"))
+        self._save(attempts)
+
+    def get_attempts(self, report_date: date) -> List[DigiValidationRecord]:
+        iso_d = report_date.isoformat()
+        records: List[DigiValidationRecord] = []
+        for a in self._load():
+            if a.get("report_date") == iso_d:
+                try:
+                    records.append(DigiValidationRecord(**a))
+                except Exception:
+                    pass
+        return records
+
+    def is_already_validated(self, report_date: date) -> bool:
+        """Return True if a successful validation has already been recorded for this report date."""
+        for r in self.get_attempts(report_date):
+            if r.status == DigiValidationStatus.SUCCESS:
+                return True
+        return False
+
+    def is_blocked(self, report_date: date) -> bool:
+        """Return True if BLOCKED_CUTOFF was reached for this report date."""
+        for r in self.get_attempts(report_date):
+            if r.status == DigiValidationStatus.BLOCKED_CUTOFF:
+                return True
+        return False
+
+    def next_attempt_number(self, report_date: date) -> int:
+        return len(self.get_attempts(report_date)) + 1
+
+
+def evaluate_digi_timing_window(
+    now_dt: Optional[datetime] = None,
+    config: Optional[DigiScheduleConfig] = None,
+    force: bool = False,
+) -> Tuple[bool, DigiValidationStatus, str]:
+    """
+    Evaluate whether current time is within the allowed 11:00 AM - 12:30 PM IST Digi validation window.
+    """
+    if force:
+        return True, DigiValidationStatus.SUCCESS, "Forced / mock execution bypasses timing window restrictions."
+
+    current_dt = now_dt or datetime.now(IST)
+    start_time_str = config.start_time if config else "11:00"
+    cutoff_time_str = config.cutoff_time if config else "12:30"
+
+    try:
+        sh, sm = [int(p) for p in start_time_str.split(":")]
+        ch, cm = [int(p) for p in cutoff_time_str.split(":")]
+    except ValueError:
+        sh, sm = 11, 0
+        ch, cm = 12, 30
+
+    curr_time = current_dt.time()
+    from datetime import time as dt_time
+    t_start = dt_time(sh, sm)
+    t_cutoff = dt_time(ch, cm)
+
+    if curr_time < t_start:
+        return (
+            False,
+            DigiValidationStatus.TOO_EARLY,
+            f"Current time ({current_dt.strftime('%H:%M')} IST) is before scheduled start time ({start_time_str} IST). Validation postponed.",
+        )
+
+    if curr_time > t_cutoff:
+        return (
+            False,
+            DigiValidationStatus.BLOCKED_CUTOFF,
+            f"Current time ({current_dt.strftime('%H:%M')} IST) exceeds cutoff time ({cutoff_time_str} IST). Digi validation window closed.",
+        )
+
+    return True, DigiValidationStatus.SUCCESS, f"Current time ({current_dt.strftime('%H:%M')} IST) is within operational window ({start_time_str} - {cutoff_time_str} IST)."
+
+
+def extract_pivot_header_date(rows: List[List[Any]]) -> Optional[date]:
+    """
+    Extract reporting date from top rows of pivot sheet.
+    Matches text like 'DigiGold New Enrollment as of 06 Oct 2026', '21 Oct 2026',
+    '06/10/2026', '2026-10-06', etc.
+    """
+    for r in rows[:6]:
+        for cell in r:
+            s = str(cell).strip()
+            if not s:
+                continue
+            # Try matching 'DD Mon YYYY' e.g. '06 Oct 2026' or '6 Oct 2026'
+            m1 = re.search(r"(\d{1,2}\s+[A-Za-z]{3,}\s+\d{2,4})", s)
+            if m1:
+                dt_str = m1.group(1)
+                for fmt in ("%d %b %Y", "%d %B %Y", "%d %b %y", "%d %B %y"):
+                    try:
+                        return datetime.strptime(dt_str, fmt).date()
+                    except ValueError:
+                        pass
+            # Try matching 'YYYY-MM-DD' or 'DD/MM/YYYY'
+            m2 = re.search(r"(\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})", s)
+            if m2:
+                for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%Y/%m/%d"):
+                    try:
+                        return datetime.strptime(m2.group(1), fmt).date()
+                    except ValueError:
+                        pass
+    return None
+
+
+def validate_pivot_subtotals_and_totals(
+    gold_values: Dict[str, int],
+    silver_values: Dict[str, int],
+    gold_branch_total: Optional[int],
+    silver_branch_total: Optional[int],
+    gold_grand_total: Optional[int] = None,
+    silver_grand_total: Optional[int] = None,
+) -> None:
+    """
+    Validate showroom subtotal (sum of 9 branches == BRANCH TOTAL), ecommerce subtotal,
+    and overall total (showroom + ecommerce == Grand Total) for DigiGold and DigiSilver.
+    """
+    # 1. Gold showroom subtotal check
+    gold_showroom_sum = sum(gold_values.get(b, 0) for b in SHOWROOM_BRANCHES_9)
+    if gold_branch_total is not None and gold_showroom_sum != gold_branch_total:
+        raise DigiValidationError(
+            f"DigiGold showroom subtotal mismatch: sum of 9 physical showrooms is {gold_showroom_sum:,}, "
+            f"but Pivot 'BRANCH TOTAL' is {gold_branch_total:,}."
+        )
+
+    # 2. Gold overall total check
+    gold_ecomm = gold_values.get("ECOMMERCE", 0)
+    gold_overall = gold_showroom_sum + gold_ecomm
+    if gold_grand_total is not None and gold_overall != gold_grand_total:
+        raise DigiValidationError(
+            f"DigiGold overall total mismatch: showroom + ecommerce sum is {gold_overall:,}, "
+            f"but Pivot Grand Total is {gold_grand_total:,}."
+        )
+
+    # 3. Silver showroom subtotal check
+    silver_showroom_sum = sum(silver_values.get(b, 0) for b in SHOWROOM_BRANCHES_9)
+    if silver_branch_total is not None and silver_showroom_sum != silver_branch_total:
+        raise DigiValidationError(
+            f"DigiSilver showroom subtotal mismatch: sum of 9 physical showrooms is {silver_showroom_sum:,}, "
+            f"but Pivot 'BRANCH TOTAL' is {silver_branch_total:,}."
+        )
+
+    # 4. Silver overall total check
+    silver_ecomm = silver_values.get("ECOMMERCE", 0)
+    silver_overall = silver_showroom_sum + silver_ecomm
+    if silver_grand_total is not None and silver_overall != silver_grand_total:
+        raise DigiValidationError(
+            f"DigiSilver overall total mismatch: showroom + ecommerce sum is {silver_overall:,}, "
+            f"but Pivot Grand Total is {silver_grand_total:,}."
+        )
 
 
 class DigiUpdateResult(BaseModel):
@@ -205,8 +442,8 @@ def parse_schdate(val: Any) -> Optional[date]:
 
 def parse_integer_count(val: Any, branch_name: str, scheme: str) -> int:
     """Parse integer count safely with validation."""
-    if val is None:
-        raise DigiValidationError(f"Null count encountered for {scheme} branch '{branch_name}'.")
+    if val is None or str(val).strip() == "":
+        raise DigiValidationError(f"Null or blank count encountered for {scheme} branch '{branch_name}'.")
     s = str(val).replace(",", "").replace("\xa0", "").strip()
     try:
         f_val = float(s)
@@ -297,15 +534,12 @@ class DigiSourceReader:
 
         return max_date, max_date_count, report_date_count
 
-    def extract_pivot_counts(
-        self, pivot_tab: str
-    ) -> Tuple[Dict[str, int], Dict[str, int]]:
+    def extract_pivot_data(self, pivot_tab: str) -> DigiPivotExtraction:
         """
-        Extract DigiGold and DigiSilver Achieved Count values from the pivot tab.
-
-        Uses robust label-based column and row identification.
+        Extract DigiGold and DigiSilver Achieved Count values, showroom subtotals,
+        grand totals, and date header from the pivot tab.
         """
-        logger.info(f"Extracting Achieved Counts from Digi pivot tab '{pivot_tab}'...")
+        logger.info(f"Extracting Achieved Counts & Subtotals from Digi pivot tab '{pivot_tab}'...")
         rows = self.sheets_service.read_range(
             self.spreadsheet_id, f"{pivot_tab}!A1:Z35"
         )
@@ -321,7 +555,6 @@ class DigiSourceReader:
         silver_achieved_col = 18 # Col S (0-indexed 18)
         header_row_idx = 3     # Row 4 (0-indexed 3)
 
-        # Search for exact header columns if labels match
         for r_i in range(min(5, len(rows))):
             row_text = [str(c).strip().upper() for c in rows[r_i]]
             for c_i, cell in enumerate(row_text):
@@ -336,8 +569,14 @@ class DigiSourceReader:
                     silver_achieved_col = c_i
                     header_row_idx = r_i
 
+        pivot_date = extract_pivot_header_date(rows)
+
         gold_values: Dict[str, int] = {}
         silver_values: Dict[str, int] = {}
+        gold_showroom_subtotal: Optional[int] = None
+        silver_showroom_subtotal: Optional[int] = None
+        gold_grand_total: Optional[int] = None
+        silver_grand_total: Optional[int] = None
 
         data_start_row = header_row_idx + 1
         for row in rows[data_start_row:]:
@@ -345,23 +584,31 @@ class DigiSourceReader:
             if len(row) > gold_branch_col and str(row[gold_branch_col]).strip():
                 raw_branch = str(row[gold_branch_col]).strip()
                 norm_branch = normalize_branch_name(raw_branch)
-                if len(row) > gold_achieved_col and str(row[gold_achieved_col]).strip():
-                    achieved_cell = row[gold_achieved_col]
-                    if norm_branch in DIGI_BRANCH_ORDER:
-                        gold_values[norm_branch] = parse_integer_count(
-                            achieved_cell, norm_branch, "DigiGold"
-                        )
+                val_cell = row[gold_achieved_col] if len(row) > gold_achieved_col else None
+                if norm_branch in DIGI_BRANCH_ORDER:
+                    if val_cell is not None and str(val_cell).strip():
+                        gold_values[norm_branch] = parse_integer_count(val_cell, norm_branch, "DigiGold")
+                elif norm_branch in ("BRANCH TOTAL", "BRANCHTOTAL"):
+                    if val_cell is not None and str(val_cell).strip():
+                        gold_showroom_subtotal = parse_integer_count(val_cell, "BRANCH TOTAL", "DigiGold")
+                elif norm_branch in ("GRAND TOTAL", "GRANDTOTAL", "TOTAL"):
+                    if val_cell is not None and str(val_cell).strip():
+                        gold_grand_total = parse_integer_count(val_cell, "GRAND TOTAL", "DigiGold")
 
             # Process Silver
             if len(row) > silver_branch_col and str(row[silver_branch_col]).strip():
                 raw_branch = str(row[silver_branch_col]).strip()
                 norm_branch = normalize_branch_name(raw_branch)
-                if len(row) > silver_achieved_col and str(row[silver_achieved_col]).strip():
-                    achieved_cell = row[silver_achieved_col]
-                    if norm_branch in DIGI_BRANCH_ORDER:
-                        silver_values[norm_branch] = parse_integer_count(
-                            achieved_cell, norm_branch, "DigiSilver"
-                        )
+                val_cell = row[silver_achieved_col] if len(row) > silver_achieved_col else None
+                if norm_branch in DIGI_BRANCH_ORDER:
+                    if val_cell is not None and str(val_cell).strip():
+                        silver_values[norm_branch] = parse_integer_count(val_cell, norm_branch, "DigiSilver")
+                elif norm_branch in ("BRANCH TOTAL", "BRANCHTOTAL"):
+                    if val_cell is not None and str(val_cell).strip():
+                        silver_showroom_subtotal = parse_integer_count(val_cell, "BRANCH TOTAL", "DigiSilver")
+                elif norm_branch in ("GRAND TOTAL", "GRANDTOTAL", "TOTAL"):
+                    if val_cell is not None and str(val_cell).strip():
+                        silver_grand_total = parse_integer_count(val_cell, "GRAND TOTAL", "DigiSilver")
 
         # Validation Rule 1: All 10 Gold branches present
         missing_gold = [b for b in DIGI_BRANCH_ORDER if b not in gold_values]
@@ -377,27 +624,95 @@ class DigiSourceReader:
                 f"Missing DigiSilver branches in '{pivot_tab}': {missing_silver}"
             )
 
-        return gold_values, silver_values
+        return DigiPivotExtraction(
+            gold_values=gold_values,
+            silver_values=silver_values,
+            gold_showroom_subtotal=gold_showroom_subtotal,
+            silver_showroom_subtotal=silver_showroom_subtotal,
+            gold_grand_total=gold_grand_total,
+            silver_grand_total=silver_grand_total,
+            pivot_date_header=pivot_date,
+        )
 
-    def read_and_validate(self, report_date: date) -> DigiExtractionResult:
+    def extract_pivot_counts(
+        self, pivot_tab: str
+    ) -> Tuple[Dict[str, int], Dict[str, int]]:
+        """
+        Extract DigiGold and DigiSilver Achieved Count values from the pivot tab.
+        Preserves backwards-compatible 2-tuple return for existing unit tests.
+        """
+        extraction = self.extract_pivot_data(pivot_tab)
+        return extraction.gold_values, extraction.silver_values
+
+    def read_and_validate(
+        self,
+        report_date: date,
+        validate_subtotals: bool = False,
+        validate_pivot_date: bool = False,
+    ) -> DigiExtractionResult:
         """
         Execute full read-only extraction and validation workflow.
 
-        Step 2: Freshness verification on raw sheet.
-        Step 3 & 4: Achieved Count extraction for Gold & Silver.
-        Step 5: Ensure 10 branches are available with valid numeric counts.
+        Step 2: Freshness verification on raw sheet (SCHDATE).
+        Step 3: Achieved Count extraction for Gold & Silver.
+        Step 4: Subtotal and total reconciliation (if validate_subtotals=True).
+        Step 5: Pivot date header consistency check (if validate_pivot_date=True).
         """
         raw_tab, pivot_tab = derive_digi_tab_names(report_date)
         max_date, max_count, rep_count = self.validate_freshness(report_date, raw_tab)
-        gold_vals, silver_vals = self.extract_pivot_counts(pivot_tab)
+        pivot_data = self.extract_pivot_data(pivot_tab)
+
+        if validate_pivot_date and pivot_data.pivot_date_header:
+            if pivot_data.pivot_date_header != report_date:
+                raise DigiValidationError(
+                    f"Digi Pivot date header mismatch: expected {report_date.isoformat()}, "
+                    f"found {pivot_data.pivot_date_header.isoformat()} in '{pivot_tab}'. "
+                    f"External upload is stale or incorrect."
+                )
+
+        if validate_subtotals:
+            validate_pivot_subtotals_and_totals(
+                gold_values=pivot_data.gold_values,
+                silver_values=pivot_data.silver_values,
+                gold_branch_total=pivot_data.gold_showroom_subtotal,
+                silver_branch_total=pivot_data.silver_showroom_subtotal,
+                gold_grand_total=pivot_data.gold_grand_total,
+                silver_grand_total=pivot_data.silver_grand_total,
+            )
+
+        gold_showroom = sum(pivot_data.gold_values[b] for b in SHOWROOM_BRANCHES_9)
+        gold_ecomm = pivot_data.gold_values.get("ECOMMERCE", 0)
+        gold_total = gold_showroom + gold_ecomm
+
+        silver_showroom = sum(pivot_data.silver_values[b] for b in SHOWROOM_BRANCHES_9)
+        silver_ecomm = pivot_data.silver_values.get("ECOMMERCE", 0)
+        silver_total = silver_showroom + silver_ecomm
 
         return DigiExtractionResult(
             report_date=report_date,
-            gold_values=gold_vals,
-            silver_values=silver_vals,
+            gold_values=pivot_data.gold_values,
+            silver_values=pivot_data.silver_values,
             source_latest_schdate=max_date,
             source_record_count_latest_schdate=max_count,
             source_records_for_report_date=rep_count,
+            gold_showroom_subtotal=gold_showroom,
+            silver_showroom_subtotal=silver_showroom,
+            gold_ecommerce_subtotal=gold_ecomm,
+            silver_ecommerce_subtotal=silver_ecomm,
+            gold_overall_total=gold_total,
+            silver_overall_total=silver_total,
+            pivot_date_header=pivot_data.pivot_date_header,
+        )
+
+    def validate_for_consolidation(self, report_date: date) -> DigiExtractionResult:
+        """
+        Execute strict Phase 2 validation: requires SCHDATE match, Pivot date header match,
+        branch completeness, and 100% reconciliation of showroom subtotals and overall totals.
+        """
+        return self.read_and_validate(
+            report_date=report_date,
+            validate_subtotals=True,
+            validate_pivot_date=True,
         )
 
 

@@ -1600,42 +1600,49 @@ def cmd_screenshot(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_daily_pipeline(args: argparse.Namespace) -> int:
-    """
-    Execute the unified 4-stage daily reporting automation workflow:
-    1. SS & SV Enrollment Data Download & Google Sheets Append
-    2. DigiGold & DigiSilver Synchronization & Date Header Update
-    3. Scheme Closing Report Synchronization & Rejoining Summary Update
-    4. Verified Screenshot Generation (stops if any stage failed or data is stale)
-    """
-    target_date = parse_target_date(getattr(args, "report_date", None))
-    today = date.today()
+def _notify_digi_blocked(config_bundle, target_date: date, reason: str, dry_run: bool = True) -> None:
+    """Send diagnostic alert to personal Telegram recipient when Digi validation fails at cutoff."""
+    from app.delivery.telegram import TelegramDeliveryChannel
+    tg_config = config_bundle.app.telegram
+    if not tg_config.enabled and not dry_run:
+        return
 
+    channel = TelegramDeliveryChannel(
+        config=tg_config,
+        enabled=True if dry_run else tg_config.enabled,
+        dry_run=dry_run or tg_config.dry_run,
+        chat_id=tg_config.chat_id,
+    )
+    if not channel.is_enabled():
+        return
+
+    alert_text = (
+        f"⚠️ POTHYS REPORTING STATUS: DIGI STAGE BLOCKED\n"
+        f"Date: {target_date.strftime('%d/%m/%Y')}\n"
+        f"Reason: {reason}\n"
+        f"Status: Final enrollment consolidation held pending. Preliminary SS/SV and closing outputs are preserved."
+    )
+    channel.send_message(text=alert_text, recipient=tg_config.chat_id, report_date=target_date)
+
+
+def run_phase1_innervex(args: argparse.Namespace, target_date: date) -> int:
+    """
+    Phase 1 (10:00 AM IST): Independent Innervex Workflow.
+    - Synchronize Subhiksham and Viruksham enrollment records to monthly sheets.
+    - Synchronize Scheme Closing Report to Closed Member sheet.
+    - Capture Closing Report screenshot independently.
+    - Does NOT depend on or wait for DigiGold/DigiSilver uploads.
+    """
+    print("\n" + "=" * 75)
+    print("PHASE 1 (10:00 AM IST): INNERVEX REPORTING WORKFLOW")
     print("=" * 75)
-    print("POTHYS SWARNA MAHAL DAILY REPORTING AUTOMATION PIPELINE")
-    print("=" * 75)
-    print(f"Execution Date:     {today.strftime('%d/%m/%Y')} ({today.isoformat()})")
     print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
-    mode_str = "MOCK / OFFLINE" if getattr(args, "mock", False) else ("DRY RUN" if getattr(args, "dry_run", False) else "LIVE PRODUCTION")
-    print(f"Pipeline Mode:      {mode_str}")
-    print("=" * 75)
 
-    if not getattr(args, "dry_run", False) and not getattr(args, "mock", False):
-        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
-            print("\n" + "!" * 75)
-            print("PIPELINE BLOCKED: STRICT READ-ONLY MODE IS ACTIVE.")
-            print("Execution of live production daily pipeline with Google Sheets mutations is prohibited.")
-            print("Please re-run with --dry-run or --mock flag.")
-            print("!" * 75 + "\n")
-            return 1
-
-    # -------------------------------------------------------------------------
-    # STAGE 1: SS & SV Enrollment Synchronization
-    # -------------------------------------------------------------------------
-    print("\n>>> STAGE 1: ENROLLMENT DATA SYNCHRONIZATION (SUBHIKSHAM & VIRUKSHAM)")
+    # 1. SS & SV Enrollment Synchronization
+    print("\n>>> [Phase 1.1] ENROLLMENT DATA SYNCHRONIZATION (SUBHIKSHAM & VIRUKSHAM)")
     print("-" * 75)
     for rep in ["subhiksham", "viruksham"]:
-        print(f"\n[Stage 1] Processing {rep.upper()} for {target_date.isoformat()}...")
+        print(f"\n[Phase 1.1] Processing {rep.upper()} for {target_date.isoformat()}...")
         rep_args = argparse.Namespace(
             report_date=target_date.isoformat(),
             report_id=rep,
@@ -1643,46 +1650,22 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
             force=getattr(args, "force", False),
         )
         if getattr(args, "mock", False):
-            print(f"[Stage 1] Mode: MOCK / OFFLINE (SIMULATED DATA)")
-            print(f"[Stage 1] Mock simulation for {rep.upper()}: SUCCESS")
+            print(f"[Phase 1.1] Mode: MOCK / OFFLINE (SIMULATED DATA)")
+            print(f"[Phase 1.1] Mock simulation for {rep.upper()}: SUCCESS")
             print(f"  Actual Google Sheets Writes: 0 (MOCK MODE)")
             print(f"  Simulated Rows:              4 (Synthetic test records)")
         else:
             rc = cmd_run(rep_args)
             if rc != 0:
-                print(f"\n[FAIL] STAGE 1 FAILED during {rep.upper()} processing.")
-                print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
+                print(f"\n[FAIL] Phase 1.1 FAILED during {rep.upper()} processing.")
+                print("Pipeline HALTED.")
                 return 1
 
     stage1_status = "SUCCESS (MOCK SIMULATION - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
-    print(f"\n[PASS] STAGE 1: Enrollment data synchronized: {stage1_status}.")
+    print(f"\n[PASS] Phase 1.1: Enrollment data synchronized: {stage1_status}.")
 
-    # -------------------------------------------------------------------------
-    # STAGE 2: DigiGold & DigiSilver Synchronization
-    # -------------------------------------------------------------------------
-    print("\n>>> STAGE 2: DIGIGOLD & DIGISILVER SYNCHRONIZATION")
-    print("-" * 75)
-    digi_args = argparse.Namespace(
-        report_date=target_date.isoformat(),
-        digi_spreadsheet_id=getattr(args, "digi_spreadsheet_id", None),
-        spreadsheet_id=getattr(args, "spreadsheet_id", None),
-        service_account=getattr(args, "service_account", None),
-        dry_run=getattr(args, "dry_run", False),
-        mock=getattr(args, "mock", False),
-    )
-    rc_digi = cmd_digi_sync(digi_args)
-    if rc_digi != 0:
-        print("\n[FAIL] STAGE 2 FAILED: DigiGold/DigiSilver synchronization failed.")
-        print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
-        return 1
-
-    stage2_status = "SUCCESS (MOCK SIMULATION - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
-    print(f"\n[PASS] STAGE 2: Digi counts and enrollment title synchronized: {stage2_status}.")
-
-    # -------------------------------------------------------------------------
-    # STAGE 3: Scheme Closing Report Synchronization
-    # -------------------------------------------------------------------------
-    print("\n>>> STAGE 3: SCHEME CLOSING REPORT SYNCHRONIZATION")
+    # 2. Scheme Closing Report Synchronization
+    print("\n>>> [Phase 1.2] SCHEME CLOSING REPORT SYNCHRONIZATION")
     print("-" * 75)
     closing_args = argparse.Namespace(
         report_date=target_date.isoformat(),
@@ -1694,21 +1677,18 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
     )
     rc_closing = cmd_closing_sync(closing_args)
     if rc_closing != 0:
-        print("\n[FAIL] STAGE 3 FAILED: Closing report synchronization failed.")
-        print("Pipeline HALTED. No downstream stages or screenshots will be executed.")
+        print("\n[FAIL] Phase 1.2 FAILED: Closing report synchronization failed.")
         return 1
 
     stage3_status = "SUCCESS (MOCK SIMULATION - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
-    print(f"\n[PASS] STAGE 3: Closing report summary synchronized: {stage3_status}.")
+    print(f"\n[PASS] Phase 1.2: Closing report summary synchronized: {stage3_status}.")
 
-    # -------------------------------------------------------------------------
-    # STAGE 4: Verified Screenshot Generation
-    # -------------------------------------------------------------------------
-    print("\n>>> STAGE 4: VERIFIED SCREENSHOT GENERATION")
+    # 3. Closing Report Screenshot Generation
+    print("\n>>> [Phase 1.3] CLOSING REPORT SCREENSHOT GENERATION")
     print("-" * 75)
     screenshot_args = argparse.Namespace(
         report_date=target_date.isoformat(),
-        target="all",
+        target="closing",
         output_dir=getattr(args, "output_dir", None),
         dpi=getattr(args, "dpi", 200),
         service_account=getattr(args, "service_account", None),
@@ -1716,57 +1696,342 @@ def cmd_daily_pipeline(args: argparse.Namespace) -> int:
     )
     rc_screenshot = cmd_screenshot(screenshot_args)
     if rc_screenshot != 0:
-        print("\n[FAIL] STAGE 4 FAILED: Verified screenshot generation failed.")
-        print("Pipeline HALTED. Delivery blocked to prevent distributing desynchronized reports.")
+        print("\n[FAIL] Phase 1.3 FAILED: Closing screenshot generation failed.")
+        return 1
+
+    print("\n[PASS] PHASE 1 COMPLETE: Innervex workflow, preliminary SS/SV outputs, and Closing Report preserved.")
+    return 0
+
+
+def run_phase2_digi_validation(args: argparse.Namespace, target_date: date) -> int:
+    """
+    Phase 2 (11:00 AM IST or later): DigiGold & DigiSilver Validation.
+    - Validates source freshness for correct reporting date (SCHDATE and Pivot header).
+    - Validates 10 branches (9 showrooms + 1 ecommerce), ensuring no blanks or nulls.
+    - Validates showroom subtotal (sum of 9 stores == BRANCH TOTAL).
+    - Validates ecommerce count and overall total.
+    - Records attempts in digi_validation_history.json.
+    - Enforces retry policy and cutoff time (12:30 PM IST).
+    - Dispatches Telegram alert if blocked at cutoff.
+    """
+    from datetime import datetime
+    from app.google_sheets.client import GoogleApiSheetsService
+    from app.reporting.digi import (
+        DEFAULT_DIGI_SPREADSHEET_ID,
+        DigiSourceReader,
+        DigiValidationTracker,
+        DigiValidationStatus,
+        DigiValidationRecord,
+        evaluate_digi_timing_window,
+    )
+
+    config_bundle = load_config()
+    digi_cfg = config_bundle.app.digi_schedule
+    tracker = DigiValidationTracker(digi_cfg.history_file)
+    attempt_num = tracker.next_attempt_number(target_date)
+
+    print("\n" + "=" * 75)
+    print("PHASE 2 (11:00 AM IST OR LATER): DIGIGOLD & DIGISILVER VALIDATION")
+    print("=" * 75)
+    print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+    print(f"Validation Attempt: #{attempt_num} (Max Retries: {digi_cfg.max_retries})")
+
+    is_force = getattr(args, "force", False)
+    if not is_force and not getattr(args, "mock", False):
+        if tracker.is_already_validated(target_date):
+            print(f"\n[IDEMPOTENT SKIP] Phase 2 Digi validation already PASSED for {target_date.isoformat()}. Skipping redundant re-validation.")
+            return 0
+        if tracker.is_blocked(target_date):
+            print(f"\n[BLOCKED] Phase 2 Digi validation previously exceeded cutoff (BLOCKED_CUTOFF) for {target_date.isoformat()}. No further retries allowed.")
+            return 1
+
+    # Timing Window Check (unless --force or --mock)
+    is_force_or_mock = is_force or getattr(args, "mock", False)
+    in_window, time_status, time_msg = evaluate_digi_timing_window(
+        config=digi_cfg,
+        force=is_force_or_mock,
+    )
+    print(f"Operational Window: {time_msg}")
+
+    if not in_window:
+        rec = DigiValidationRecord(
+            report_date=target_date,
+            attempt=attempt_num,
+            timestamp=datetime.now().isoformat(),
+            status=time_status,
+            error_message=time_msg,
+        )
+        tracker.record_attempt(rec)
+
+        if time_status == DigiValidationStatus.BLOCKED_CUTOFF:
+            print(f"\n[BLOCKED] PHASE 2 BLOCKED: Cutoff exceeded. Final enrollment consolidation held pending.")
+            _notify_digi_blocked(config_bundle, target_date, time_msg, dry_run=getattr(args, "dry_run", False))
+            return 1
+        else:
+            print(f"\n[PENDING] PHASE 2 PENDING: Execution scheduled for after 11:00 AM IST. Preliminary outputs preserved.")
+            return 2
+
+    # If mock mode:
+    if getattr(args, "mock", False):
+        print("Digi Source Read: MOCK / OFFLINE SIMULATION")
+        print("  SCHDATE Freshness:       PASS (Mock Date Validated)")
+        print("  Pivot Date Header:       PASS (as of " + target_date.strftime("%d %b %Y") + ")")
+        print("  Showroom Subtotal (9):   PASS (Gold: 4,233 == 4,233 | Silver: 1,488 == 1,488)")
+        print("  Ecommerce Subtotal:      PASS (Gold: 1,275 | Silver: 267)")
+        print("  Overall Total:           PASS (Gold: 5,508 | Silver: 1,755)")
+        rec = DigiValidationRecord(
+            report_date=target_date,
+            attempt=attempt_num,
+            timestamp=datetime.now().isoformat(),
+            status=DigiValidationStatus.SUCCESS,
+            gold_showroom_subtotal=4233,
+            gold_ecommerce_subtotal=1275,
+            gold_overall_total=5508,
+            silver_showroom_subtotal=1488,
+            silver_ecommerce_subtotal=267,
+            silver_overall_total=1755,
+        )
+        tracker.record_attempt(rec)
+        print("\n[PASS] PHASE 2 VALIDATION SUCCESSFUL (MOCK MODE).")
+        return 0
+
+    # Live / Dry-Run Validation
+    digi_sid = getattr(args, "digi_spreadsheet_id", None) or os.getenv("GOOGLE_SHEET_DIGI_ID", DEFAULT_DIGI_SPREADSHEET_ID)
+    sa_path = getattr(args, "service_account", None) or os.getenv("GOOGLE_SERVICE_ACCOUNT_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+    try:
+        source_svc = GoogleApiSheetsService(
+            service_account_path=sa_path,
+            service_account_json=sa_json,
+            read_only=True,
+        )
+        reader = DigiSourceReader(source_svc, spreadsheet_id=digi_sid)
+        extraction = reader.validate_for_consolidation(target_date)
+
+        print("Digi Source Read (Read-Only Authorized):")
+        print(f"  SCHDATE Records Found:   {extraction.source_records_for_report_date} (Latest SCHDATE: {extraction.source_latest_schdate})")
+        print(f"  Pivot Date Header:       PASS ({extraction.pivot_date_header or 'Validated'})")
+        print(f"  Gold Showroom Subtotal:  PASS ({extraction.gold_showroom_subtotal:,})")
+        print(f"  Gold Ecommerce:          PASS ({extraction.gold_ecommerce_subtotal:,})")
+        print(f"  Gold Overall Total:      PASS ({extraction.gold_overall_total:,})")
+        print(f"  Silver Showroom Subtotal:PASS ({extraction.silver_showroom_subtotal:,})")
+        print(f"  Silver Ecommerce:        PASS ({extraction.silver_ecommerce_subtotal:,})")
+        print(f"  Silver Overall Total:    PASS ({extraction.silver_overall_total:,})")
+
+        rec = DigiValidationRecord(
+            report_date=target_date,
+            attempt=attempt_num,
+            timestamp=datetime.now().isoformat(),
+            status=DigiValidationStatus.SUCCESS,
+            gold_showroom_subtotal=extraction.gold_showroom_subtotal,
+            gold_ecommerce_subtotal=extraction.gold_ecommerce_subtotal,
+            gold_overall_total=extraction.gold_overall_total,
+            silver_showroom_subtotal=extraction.silver_showroom_subtotal,
+            silver_ecommerce_subtotal=extraction.silver_ecommerce_subtotal,
+            silver_overall_total=extraction.silver_overall_total,
+        )
+        tracker.record_attempt(rec)
+        print("\n[PASS] PHASE 2 VALIDATION SUCCESSFUL: Source data verified complete and consistent.")
+        return 0
+
+    except Exception as e:
+        err_desc = f"{type(e).__name__}: {e}"
+        print(f"\n[FAIL] Phase 2 Validation Failed on Attempt #{attempt_num}: {err_desc}")
+        status = DigiValidationStatus.BLOCKED_CUTOFF if attempt_num >= digi_cfg.max_retries else DigiValidationStatus.PENDING_RETRY
+        rec = DigiValidationRecord(
+            report_date=target_date,
+            attempt=attempt_num,
+            timestamp=datetime.now().isoformat(),
+            status=status,
+            error_message=err_desc,
+        )
+        tracker.record_attempt(rec)
+
+        if attempt_num >= digi_cfg.max_retries:
+            print(f"[BLOCKED] Maximum retry attempts ({digi_cfg.max_retries}) reached. Digi stage BLOCKED.")
+            _notify_digi_blocked(config_bundle, target_date, err_desc, dry_run=getattr(args, "dry_run", False))
+        else:
+            print(f"[PENDING_RETRY] Validation will retry in {digi_cfg.retry_interval_minutes} minutes ({digi_cfg.max_retries - attempt_num} attempts remaining).")
+
+        return 1
+
+
+def run_phase3_consolidation_and_delivery(args: argparse.Namespace, target_date: date) -> int:
+    """
+    Phase 3: Final Enrollment Consolidation & Personal Telegram Delivery.
+    - Only runs after Phase 2 passes validation.
+    - Populates Consolidate Report (I20:J29, L20:L30, E3) with verified post-write checks.
+    - Generates verified Enrollment Report screenshot.
+    - Sends enrollment screenshot to configured personal Telegram chat ID only.
+    - Never sends preliminary or stale Digi report labelled as final.
+    """
+    from app.reporting.digi import DigiValidationTracker
+
+    config_bundle = load_config()
+    digi_cfg = config_bundle.app.digi_schedule
+    tracker = DigiValidationTracker(digi_cfg.history_file)
+
+    print("\n" + "=" * 75)
+    print("PHASE 3: FINAL ENROLLMENT CONSOLIDATION & PERSONAL TELEGRAM DELIVERY")
+    print("=" * 75)
+    print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+
+    # Guard: Require Phase 2 validation success
+    if not getattr(args, "mock", False) and not tracker.is_already_validated(target_date):
+        print("\n[VALIDATION CHECK] Verifying Phase 2 Digi source validation status...")
+        rc_val = run_phase2_digi_validation(args, target_date)
+        if rc_val != 0:
+            print("\n[BLOCKED] PHASE 3 BLOCKED: Phase 2 Digi validation not passed.")
+            print("Final enrollment consolidation held pending. Zero external delivery performed.")
+            return 1
+
+    # 1. Synchronize DigiGold & DigiSilver to destination Consolidate Report
+    print("\n>>> [Phase 3.1] DIGIGOLD & DIGISILVER CONSOLIDATE REPORT SYNCHRONIZATION")
+    print("-" * 75)
+    digi_args = argparse.Namespace(
+        report_date=target_date.isoformat(),
+        digi_spreadsheet_id=getattr(args, "digi_spreadsheet_id", None),
+        spreadsheet_id=getattr(args, "spreadsheet_id", None),
+        service_account=getattr(args, "service_account", None),
+        dry_run=getattr(args, "dry_run", False),
+        mock=getattr(args, "mock", False),
+    )
+    rc_digi = cmd_digi_sync(digi_args)
+    if rc_digi != 0:
+        print("\n[FAIL] Phase 3.1 FAILED: Digi synchronization failed.")
+        return 1
+
+    # 2. Capture Verified Final Enrollment Screenshot
+    print("\n>>> [Phase 3.2] VERIFIED FINAL ENROLLMENT SCREENSHOT GENERATION")
+    print("-" * 75)
+    screenshot_args = argparse.Namespace(
+        report_date=target_date.isoformat(),
+        target="enrollment",
+        output_dir=getattr(args, "output_dir", None),
+        dpi=getattr(args, "dpi", 200),
+        service_account=getattr(args, "service_account", None),
+        mock=getattr(args, "mock", False),
+    )
+    rc_screenshot = cmd_screenshot(screenshot_args)
+    if rc_screenshot != 0:
+        print("\n[FAIL] Phase 3.2 FAILED: Verified enrollment screenshot generation failed.")
+        print("Telegram delivery blocked to prevent distributing unverified reports.")
         return 1
 
     stage4_status = "SUCCESS (MOCK SCREENSHOTS - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
-    print(f"\n[PASS] STAGE 4: Verified screenshot generation completed: {stage4_status}.")
+    print(f"\n[PASS] Phase 3.2: Verified screenshot generation completed: {stage4_status}.")
 
-    # -------------------------------------------------------------------------
-    # STAGE 5: WhatsApp Executive Report Delivery Channel
-    # -------------------------------------------------------------------------
-    print("\n>>> STAGE 5: WHATSAPP EXECUTIVE REPORT DELIVERY")
+    # 3. Deliver Final Enrollment Screenshot via Telegram to configured personal recipient
+    print("\n>>> [Phase 3.3] TELEGRAM FINAL ENROLLMENT REPORT DELIVERY")
     print("-" * 75)
+    tg_args = argparse.Namespace(
+        report_date=target_date.isoformat(),
+        recipient=getattr(args, "recipient", None),
+        screenshot_path=None,
+        target="enrollment",
+        dry_run=getattr(args, "dry_run", False),
+        force=getattr(args, "force", False),
+        mock=getattr(args, "mock", False),
+        output_dir=getattr(args, "output_dir", None),
+    )
+    rc_tg = cmd_send_telegram(tg_args)
+    if rc_tg != 0:
+        print("\n[FAIL] Phase 3.3 FAILED: Telegram delivery failed.")
+        return 1
+
+    # 4. Optional WhatsApp Delivery (if configured and enabled)
     from app.delivery.whatsapp import WhatsAppDeliveryChannel, redact_phone_number
     from app.delivery.base import DeliveryStatus
-
-    config_bundle = load_config()
     wa_channel = WhatsAppDeliveryChannel(
         config=config_bundle.app.whatsapp,
         dry_run=getattr(args, "dry_run", False) or getattr(args, "mock", False),
     )
-    if not wa_channel.is_enabled():
-        print("[SKIP] STAGE 5: WhatsApp delivery channel is disabled (enabled=false).")
-        print("  Executive screenshot distribution is paused pending management authorization.")
-        print("  Zero external WhatsApp messages sent.")
-    else:
-        recipient = getattr(args, "recipient", None)
-        print("Delivering verified report screenshots to recipient...")
+    if wa_channel.is_enabled():
+        print("\n>>> [Phase 3.4] WHATSAPP EXECUTIVE REPORT DELIVERY")
+        print("-" * 75)
         receipt = wa_channel.send_daily_screenshots(
             report_date=target_date,
-            recipient=recipient,
+            recipient=getattr(args, "recipient", None),
             force=getattr(args, "force", False),
             screenshots_dir=getattr(args, "output_dir", None),
         )
         masked_recip = redact_phone_number(receipt.recipient)
         if receipt.status == DeliveryStatus.SENT:
             mode_desc = "SIMULATED (DRY RUN)" if (wa_channel.dry_run or os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes")) else "LIVE DELIVERY"
-            print(f"[PASS] STAGE 5: Delivery successful ({mode_desc})")
-            print(f"  Recipient:        {masked_recip}")
-            print(f"  Message ID:       {receipt.message_id}")
-            print(f"  Attachments Sent: {receipt.attachments_sent}")
+            print(f"[PASS] Phase 3.4: WhatsApp delivery successful ({mode_desc}) to {masked_recip}")
         elif receipt.status == DeliveryStatus.DUPLICATE:
-            print(f"[WARN] STAGE 5: Delivery skipped ({receipt.error_message})")
+            print(f"[WARN] Phase 3.4: WhatsApp delivery skipped ({receipt.error_message})")
         else:
-            print(f"[FAIL] STAGE 5: Delivery failed: {receipt.error_message}")
+            print(f"[FAIL] Phase 3.4: WhatsApp delivery failed: {receipt.error_message}")
+
+    print("\n[PASS] PHASE 3 COMPLETE: Final enrollment consolidated and delivered successfully.")
+    return 0
+
+
+def cmd_validate_digi(args: argparse.Namespace) -> int:
+    """Execute standalone Phase 2 DigiGold/DigiSilver validation."""
+    target_date = parse_target_date(getattr(args, "report_date", None))
+    return run_phase2_digi_validation(args, target_date)
+
+
+def cmd_consolidate_final(args: argparse.Namespace) -> int:
+    """Execute standalone Phase 3 Final Enrollment Consolidation & Telegram delivery."""
+    target_date = parse_target_date(getattr(args, "report_date", None))
+    return run_phase3_consolidation_and_delivery(args, target_date)
+
+
+def cmd_daily_pipeline(args: argparse.Namespace) -> int:
+    """
+    Execute daily reporting automation pipeline with phase orchestration:
+    - Phase 1 (10:00 AM IST): Innervex SS/SV, Closing Sync, Closing Screenshot.
+    - Phase 2 (11:00 AM IST): DigiGold & DigiSilver Source Validation & Retries.
+    - Phase 3 (Immediate post Phase 2): Consolidation, Enrollment Screenshot, Personal Telegram.
+    """
+    target_date = parse_target_date(getattr(args, "report_date", None))
+    today = date.today()
+    phase = getattr(args, "phase", "all")
+
+    print("=" * 75)
+    print("POTHYS SWARNA MAHAL DAILY REPORTING AUTOMATION PIPELINE")
+    print("=" * 75)
+    print(f"Execution Date:     {today.strftime('%d/%m/%Y')} ({today.isoformat()})")
+    print(f"Target Report Date: {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+    mode_str = "MOCK / OFFLINE" if getattr(args, "mock", False) else ("DRY RUN" if getattr(args, "dry_run", False) else "LIVE PRODUCTION")
+    print(f"Pipeline Mode:      {mode_str}")
+    print(f"Selected Phase:     {phase.upper()}")
+    print("=" * 75)
+
+    if not getattr(args, "dry_run", False) and not getattr(args, "mock", False):
+        if os.getenv("STRICT_READ_ONLY", "false").lower() in ("true", "1", "yes"):
+            print("\n" + "!" * 75)
+            print("PIPELINE BLOCKED: STRICT READ-ONLY MODE IS ACTIVE.")
+            print("Execution of live production daily pipeline with Google Sheets mutations is prohibited.")
+            print("Please re-run with --dry-run or --mock flag.")
+            print("!" * 75 + "\n")
             return 1
 
-    mode_tag = " [MOCK / OFFLINE SIMULATION - ZERO PRODUCTION WRITES]" if getattr(args, "mock", False) else ""
-    print("\n" + "=" * 75)
-    print("ALL PIPELINE STAGES COMPLETED SUCCESSFULLY FOR TARGET DATE:", target_date.isoformat() + mode_tag)
-    print("=" * 75)
-    return 0
+    if phase == "1":
+        return run_phase1_innervex(args, target_date)
+    elif phase == "2":
+        return run_phase2_digi_validation(args, target_date)
+    elif phase in ("3", "phase3"):
+        return run_phase3_consolidation_and_delivery(args, target_date)
+    elif phase in ("2-3", "2_3"):
+        rc2 = run_phase2_digi_validation(args, target_date)
+        if rc2 != 0:
+            return rc2
+        return run_phase3_consolidation_and_delivery(args, target_date)
+    else:  # "all"
+        rc1 = run_phase1_innervex(args, target_date)
+        if rc1 != 0:
+            return rc1
+        rc2 = run_phase2_digi_validation(args, target_date)
+        if rc2 != 0:
+            print("\n[NOTE] Phase 1 completed successfully and preliminary outputs are preserved.")
+            print("[NOTE] Phase 2 Digi validation is pending or blocked. Final enrollment consolidation held pending.")
+            return rc2
+        return run_phase3_consolidation_and_delivery(args, target_date)
 
 
 def cmd_send_whatsapp(args: argparse.Namespace) -> int:
@@ -1819,6 +2084,119 @@ def cmd_send_whatsapp(args: argparse.Namespace) -> int:
 
     if receipt.status == DeliveryStatus.SENT:
         print("\nSUCCESS: WhatsApp executive report delivery completed successfully.")
+        return 0
+    elif receipt.status == DeliveryStatus.DUPLICATE:
+        print(f"\nWARNING: {receipt.error_message}")
+        return 0
+    else:
+        print(f"\nFAILURE: {receipt.error_message}")
+        return 1
+
+
+def cmd_send_telegram(args: argparse.Namespace) -> int:
+    """Send verified executive report screenshot via Telegram delivery channel."""
+    config_bundle = load_config()
+    target_date = parse_target_date(getattr(args, "report_date", None))
+
+    print("=" * 70)
+    print("POTHYS SWARNA MAHAL TELEGRAM REPORT DELIVERY")
+    print("=" * 70)
+    print(f"Report Date:   {target_date.strftime('%d/%m/%Y')} ({target_date.isoformat()})")
+
+    # Decoupled Delivery Authorization Guard:
+    # Telegram outbound photo delivery is decoupled from Google Sheets/Innervex read-only controls.
+    # Live transmission strictly requires all three conditions:
+    #   1. TELEGRAM_ENABLED=true in config / .env
+    #   2. TELEGRAM_DRY_RUN=false in config / .env (and --dry-run flag NOT passed on CLI)
+    #   3. Destination chat ID matches the single authorized personal chat ID (validated in channel)
+    is_explicit_dry_run = getattr(args, "dry_run", False) or getattr(args, "mock", False)
+    tg_config = config_bundle.app.telegram
+
+    if is_explicit_dry_run:
+        dry_run = True
+        channel_enabled = True  # Allow safe dry-run simulation even if channel is disabled in config
+    else:
+        dry_run = tg_config.dry_run
+        channel_enabled = tg_config.enabled
+
+    mode_desc = "MOCK / OFFLINE (SIMULATED ZERO NETWORK)" if getattr(args, "mock", False) else ("DRY RUN (Simulated)" if dry_run else "LIVE PRODUCTION")
+    print(f"Mode:          {mode_desc}")
+
+    from app.delivery.telegram import (
+        TelegramDeliveryChannel,
+        redact_chat_id,
+        resolve_telegram_screenshot,
+        format_telegram_caption,
+    )
+    from app.delivery.base import DeliveryStatus
+
+    target_chat_id = getattr(args, "recipient", None) or tg_config.chat_id
+    masked_chat = redact_chat_id(target_chat_id)
+    print(f"Recipient:     {masked_chat}")
+
+    channel = TelegramDeliveryChannel(
+        config=tg_config,
+        enabled=channel_enabled,
+        dry_run=dry_run,
+        chat_id=target_chat_id,
+    )
+
+    if not channel.is_enabled():
+        print("\nERROR: Telegram delivery channel is disabled (telegram.enabled=false).")
+        print("To authorize live transmission, configure locally in .env:")
+        print("  TELEGRAM_ENABLED=true")
+        print("  TELEGRAM_DRY_RUN=false")
+        print("To simulate delivery safely with zero external calls, pass --dry-run:")
+        print("  python -m app send-telegram --dry-run --report-date 2026-10-20")
+        return 1
+
+    # Screenshot selection
+    target_type = getattr(args, "target", "enrollment")
+    screenshot_path_arg = getattr(args, "screenshot_path", None)
+    if screenshot_path_arg:
+        screenshot_file = Path(screenshot_path_arg).resolve()
+        if not screenshot_file.is_file():
+            print(f"\nERROR: Specified screenshot path not found: {screenshot_file}")
+            return 1
+    else:
+        try:
+            screenshot_file = resolve_telegram_screenshot(
+                report_date=target_date,
+                target=target_type,
+                screenshots_dir=getattr(args, "output_dir", None),
+            )
+        except FileNotFoundError as e:
+            print(f"\nERROR: Screenshot resolution failed: {e}")
+            return 1
+
+    file_size = screenshot_file.stat().st_size
+    print(f"Screenshot:    {screenshot_file.name} ({file_size:,} bytes)")
+    print(f"File Path:     {screenshot_file}")
+
+    caption = format_telegram_caption(
+        report_date=target_date,
+        report_title="Enrollment Performance Report" if "enrollment" in target_type else "Executive Report",
+    )
+
+    receipt = channel.send_photo(
+        photo_path=screenshot_file,
+        caption=caption,
+        recipient=target_chat_id,
+        report_date=target_date,
+        force=getattr(args, "force", False),
+    )
+
+    masked_recip = redact_chat_id(receipt.recipient)
+    print("\n" + "-" * 70)
+    print("DELIVERY RESULT")
+    print("-" * 70)
+    print(f"Status:           {receipt.status.value}")
+    print(f"Recipient:        {masked_recip}")
+    print(f"Message ID:       {receipt.message_id or '[NONE]'}")
+    print(f"Attachments Sent: {receipt.attachments_sent}")
+
+    if receipt.status == DeliveryStatus.SENT:
+        print("\nSUCCESS: Telegram executive report delivery completed successfully.")
         return 0
     elif receipt.status == DeliveryStatus.DUPLICATE:
         print(f"\nWARNING: {receipt.error_message}")
@@ -2138,6 +2516,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Recipient phone number for WhatsApp delivery (overrides WHATSAPP_RECIPIENT)",
     )
+    daily_parser.add_argument(
+        "--phase",
+        type=str,
+        default="all",
+        choices=["1", "2", "3", "2-3", "all"],
+        help="Pipeline phase: '1' (Innervex SS/SV & Closing), '2' (Digi Validation), '3' (Consolidation & Telegram), '2-3' (Validation + Consolidation), or 'all' (default)",
+    )
 
     # Command: send-whatsapp
     wa_parser = subparsers.add_parser(
@@ -2180,6 +2565,149 @@ def build_parser() -> argparse.ArgumentParser:
         help="WhatsApp delivery mode: 'template' (default for Meta business-initiated) or 'session' (24h window free-form)",
     )
 
+    # Command: send-telegram
+    tg_parser = subparsers.add_parser(
+        "send-telegram",
+        help="Deliver verified report screenshot to Telegram chat",
+    )
+    tg_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD). Defaults to yesterday.",
+    )
+    tg_parser.add_argument(
+        "--recipient",
+        type=str,
+        default=None,
+        help="Recipient Telegram chat ID (restricted to configured personal chat ID).",
+    )
+    tg_parser.add_argument(
+        "--screenshot-path",
+        type=str,
+        default=None,
+        help="Explicit path to a screenshot PNG file to deliver.",
+    )
+    tg_parser.add_argument(
+        "--target",
+        type=str,
+        default="enrollment",
+        choices=["enrollment", "closing"],
+        help="Screenshot report target type to deliver ('enrollment' or 'closing')",
+    )
+    tg_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate delivery with full validation but zero external network calls",
+    )
+    tg_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass duplicate-send check and re-deliver report",
+    )
+    tg_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory where screenshots are stored (defaults to data/screenshots)",
+    )
+
+    # Command: validate-digi (Phase 2 Standalone)
+    vdigi_parser = subparsers.add_parser(
+        "validate-digi",
+        help="Validate DigiGold/DigiSilver Google Sheets source upload (Phase 2)",
+    )
+    vdigi_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD)",
+    )
+    vdigi_parser.add_argument(
+        "--digi-spreadsheet-id",
+        type=str,
+        default=None,
+        help="Source Digi Workbook ID",
+    )
+    vdigi_parser.add_argument(
+        "--service-account",
+        type=str,
+        default=None,
+        help="Path to Google Service Account JSON",
+    )
+    vdigi_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run validation in dry-run mode",
+    )
+    vdigi_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force execution even if outside 11:00 AM - 12:30 PM IST window",
+    )
+    vdigi_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Execute using Mock Google Sheets service for offline verification",
+    )
+
+    # Command: consolidate-final (Phase 3 Standalone)
+    cfinal_parser = subparsers.add_parser(
+        "consolidate-final",
+        help="Consolidate Digi numbers and deliver final enrollment report (Phase 3)",
+    )
+    cfinal_parser.add_argument(
+        "--report-date",
+        type=str,
+        default=None,
+        help="Target report date (YYYY-MM-DD)",
+    )
+    cfinal_parser.add_argument(
+        "--spreadsheet-id",
+        type=str,
+        default=None,
+        help="Destination Spreadsheet ID",
+    )
+    cfinal_parser.add_argument(
+        "--digi-spreadsheet-id",
+        type=str,
+        default=None,
+        help="Source Digi Workbook ID",
+    )
+    cfinal_parser.add_argument(
+        "--service-account",
+        type=str,
+        default=None,
+        help="Path to Google Service Account JSON",
+    )
+    cfinal_parser.add_argument(
+        "--recipient",
+        type=str,
+        default=None,
+        help="Telegram chat ID (restricted to configured personal chat ID)",
+    )
+    cfinal_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate execution without modifying sheets or external network calls",
+    )
+    cfinal_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Bypass idempotency / duplicate delivery checks",
+    )
+    cfinal_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Execute using mock services for offline verification",
+    )
+    cfinal_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory where screenshots are stored",
+    )
+
     return parser
 
 
@@ -2195,8 +2723,14 @@ def main() -> None:
         sys.exit(cmd_run(args))
     elif args.command == "run-daily":
         sys.exit(cmd_daily_pipeline(args))
+    elif args.command == "validate-digi":
+        sys.exit(cmd_validate_digi(args))
+    elif args.command == "consolidate-final":
+        sys.exit(cmd_consolidate_final(args))
     elif args.command == "send-whatsapp":
         sys.exit(cmd_send_whatsapp(args))
+    elif args.command == "send-telegram":
+        sys.exit(cmd_send_telegram(args))
     elif args.command == "validate":
         sys.exit(cmd_validate(args))
     elif args.command == "auth-test":
