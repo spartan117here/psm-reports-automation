@@ -1,0 +1,267 @@
+{
+  "test_name": "TEST 4 \u2014 INDEPENDENT MATHEMATICAL RECONCILIATION",
+  "target_date": "2026-10-25",
+  "timestamp_utc": "2026-10-27T06:22:37.831111+00:00",
+  "enrollment_reconciliation": {
+    "ss_records_calculated": 317,
+    "ss_amount_calculated": 2839000.0,
+    "ss_amount_underlying_raw": 2839000.0,
+    "ss_amount_matches_raw": true,
+    "sv_records_calculated": 72,
+    "sv_amount_calculated": 21511494.0,
+    "sv_amount_underlying_raw": 21511494.0,
+    "sv_amount_matches_raw": true,
+    "total_records": 389,
+    "total_amount": 24350494.0,
+    "branch_breakdown": {
+      "TVL": {
+        "ss_count": 19,
+        "ss_amount": 58000.0,
+        "sv_count": 6,
+        "sv_amount": 2281307.0,
+        "total_count": 25,
+        "total_amount": 2339307.0
+      },
+      "CPT": {
+        "ss_count": 71,
+        "ss_amount": 874500.0,
+        "sv_count": 11,
+        "sv_amount": 3001871.0,
+        "total_count": 82,
+        "total_amount": 3876371.0
+      },
+      "TVM": {
+        "ss_count": 13,
+        "ss_amount": 88500.0,
+        "sv_count": 2,
+        "sv_amount": 824599.0,
+        "total_count": 15,
+        "total_amount": 913099.0
+      },
+      "TPJ": {
+        "ss_count": 31,
+        "ss_amount": 150000.0,
+        "sv_count": 8,
+        "sv_amount": 1541871.0,
+        "total_count": 39,
+        "total_amount": 1691871.0
+      },
+      "CBE": {
+        "ss_count": 19,
+        "ss_amount": 146500.0,
+        "sv_count": 2,
+        "sv_amount": 1570322.0,
+        "total_count": 21,
+        "total_amount": 1716822.0
+      },
+      "SLM": {
+        "ss_count": 11,
+        "ss_amount": 32000.0,
+        "sv_count": 5,
+        "sv_amount": 1278760.0,
+        "total_count": 16,
+        "total_amount": 1310760.0
+      },
+      "PNM": {
+        "ss_count": 21,
+        "ss_amount": 187500.0,
+        "sv_count": 3,
+        "sv_amount": 1191487.0,
+        "total_count": 24,
+        "total_amount": 1378987.0
+      },
+      "PADI": {
+        "ss_count": 51,
+        "ss_amount": 726000.0,
+        "sv_count": 17,
+        "sv_amount": 5625206.0,
+        "total_count": 68,
+        "total_amount": 6351206.0
+      },
+      "KANCHI": {
+        "ss_count": 23,
+        "ss_amount": 171500.0,
+        "sv_count": 5,
+        "sv_amount": 1611800.0,
+        "total_count": 28,
+        "total_amount": 1783300.0
+      },
+      "ONLINE": {
+        "ss_count": 18,
+        "ss_amount": 117000.0,
+        "sv_count": 8,
+        "sv_amount": 860259.0,
+        "total_count": 26,
+        "total_amount": 977259.0
+      },
+      "NGL (Unresolved)": {
+        "ss_count": 40,
+        "ss_amount": 287500.0,
+        "sv_count": 5,
+        "sv_amount": 1724012.0,
+        "total_count": 45,
+        "total_amount": 2011512.0
+      },
+      "OTHER (Unresolved)": {
+        "ss_count": 0,
+        "ss_amount": 0.0,
+        "sv_count": 0,
+        "sv_amount": 0.0,
+        "total_count": 0,
+        "total_amount": 0.0
+      }
+    }
+  },
+  "target_and_divisor_analysis": {
+    "reporting_day_of_month": 25,
+    "daily_average_divisor_used": 25,
+    "single_day_daily_average_inr": 974019.76,
+    "target_sum_8_branches_inr": 313000000.0,
+    "target_sum_with_kanchi_inr": 340000000.0,
+    "required_daily_run_rate_8_branches_inr": 10096774.19,
+    "required_daily_run_rate_with_kanchi_inr": 10967741.94,
+    "root_cause_explanation": "Google Sheet cell F16 formula is =SUM(F6:F13) (8 branches). When Row 14 (KANCHI: 27M) was added, formula was not expanded to =SUM(F6:F14). Sum of 8 is 313M; sum of 9 is 340M."
+  },
+  "closing_reconciliation": {
+    "total_closing_count": 333,
+    "total_closing_weight_grams": 2542.698,
+    "raw_source_weight_grams": 2542.698,
+    "closing_weight_matches_raw": true,
+    "breakdown_by_showroom": {
+      "TVL": {
+        "count": 27,
+        "weight_grams": 221.796
+      },
+      "TPJ": {
+        "count": 44,
+        "weight_grams": 225.956
+      },
+      "CPT": {
+        "count": 88,
+        "weight_grams": 890.351
+      },
+      "CBE": {
+        "count": 46,
+        "weight_grams": 150.994
+      },
+      "TVM": {
+        "count": 30,
+        "weight_grams": 407.789
+      },
+      "SLM": {
+        "count": 34,
+        "weight_grams": 256.843
+      },
+      "ECOM": {
+        "count": 22,
+        "weight_grams": 144.43
+      },
+      "PADI": {
+        "count": 18,
+        "weight_grams": 138.297
+      },
+      "APP": {
+        "count": 3,
+        "weight_grams": 4.315
+      },
+      "PNM": {
+        "count": 21,
+        "weight_grams": 101.927
+      }
+    },
+    "breakdown_by_scheme": {
+      "NEW SWARNA SUBHIKSHAM": {
+        "count": 291,
+        "weight_grams": 1342.653
+      },
+      "SWARNA VIRUKSHAM": {
+        "count": 42,
+        "weight_grams": 1200.045
+      }
+    }
+  },
+  "rejoining_reconciliation": {
+    "total_closings": 333,
+    "total_rejoining_ss_matched": 53,
+    "total_rejoining_sv_matched": 0,
+    "total_rejoining_distinct_members": 53,
+    "overall_rejoining_percentage": 15.92,
+    "breakdown_by_showroom": {
+      "APP": {
+        "closed_count": 3,
+        "rejoining_ss": 1,
+        "rejoining_sv": 0,
+        "total_rejoining": 1,
+        "rejoining_percentage": 33.33
+      },
+      "CBE": {
+        "closed_count": 46,
+        "rejoining_ss": 11,
+        "rejoining_sv": 0,
+        "total_rejoining": 11,
+        "rejoining_percentage": 23.91
+      },
+      "CPT": {
+        "closed_count": 88,
+        "rejoining_ss": 17,
+        "rejoining_sv": 0,
+        "total_rejoining": 17,
+        "rejoining_percentage": 19.32
+      },
+      "ECOM": {
+        "closed_count": 22,
+        "rejoining_ss": 2,
+        "rejoining_sv": 0,
+        "total_rejoining": 2,
+        "rejoining_percentage": 9.09
+      },
+      "PADI": {
+        "closed_count": 18,
+        "rejoining_ss": 0,
+        "rejoining_sv": 0,
+        "total_rejoining": 0,
+        "rejoining_percentage": 0.0
+      },
+      "PNM": {
+        "closed_count": 21,
+        "rejoining_ss": 4,
+        "rejoining_sv": 0,
+        "total_rejoining": 4,
+        "rejoining_percentage": 19.05
+      },
+      "SLM": {
+        "closed_count": 34,
+        "rejoining_ss": 0,
+        "rejoining_sv": 0,
+        "total_rejoining": 0,
+        "rejoining_percentage": 0.0
+      },
+      "TPJ": {
+        "closed_count": 44,
+        "rejoining_ss": 7,
+        "rejoining_sv": 0,
+        "total_rejoining": 7,
+        "rejoining_percentage": 15.91
+      },
+      "TVL": {
+        "closed_count": 27,
+        "rejoining_ss": 6,
+        "rejoining_sv": 0,
+        "total_rejoining": 6,
+        "rejoining_percentage": 22.22
+      },
+      "TVM": {
+        "closed_count": 30,
+        "rejoining_ss": 5,
+        "rejoining_sv": 0,
+        "total_rejoining": 5,
+        "rejoining_percentage": 16.67
+      }
+    }
+  },
+  "dg_ds_reconciliation": {
+    "status": "BLOCKED",
+    "reason": "Authorized read-only Google Service Account credentials missing at secrets/service_account.json. Live extraction forbidden. Zero fabricated data introduced."
+  },
+  "overall_status": "PASS"
+}

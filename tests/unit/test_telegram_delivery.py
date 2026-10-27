@@ -597,22 +597,107 @@ def test_simulated_records_in_history_ignored(sample_image: Path, tmp_path: Path
 
 
 def test_caption_formatting():
-    """Verify caption structure and length within 1024 char limit."""
+    """Verify caption contains exactly two lines with professional header and dynamic date."""
     caption = format_telegram_caption(
         report_date=date(2026, 10, 20),
-        report_title="Enrollment Report",
+        report_title="New Enrollment Report",
         enrollment_total=450,
         closing_total=320,
         rejoining_rate_pct=21.45,
         notes="All branches verified.",
     )
-    assert "POTHYS SWARNA MAHAL" in caption
-    assert "20/10/2026" in caption
-    assert "450" in caption
-    assert "320" in caption
-    assert "21.45%" in caption
-    assert "All branches verified." in caption
-    assert len(caption) <= 1024
+    expected = "POTHYS SWARNA MAHAL\nDaily New Enrollment Report — 20/10/2026"
+    assert caption == expected
+    lines = caption.split("\n")
+    assert len(lines) == 2
+    assert lines[0] == "POTHYS SWARNA MAHAL"
+    assert lines[1] == "Daily New Enrollment Report — 20/10/2026"
+
+
+def test_caption_exact_new_enrollment_report_26_oct():
+    """Verify exact two-line caption for New Enrollment Report on 26/10/2026."""
+    caption = format_telegram_caption(
+        report_date=date(2026, 10, 26),
+        report_title="New Enrollment Report",
+    )
+    expected = "POTHYS SWARNA MAHAL\nDaily New Enrollment Report — 26/10/2026"
+    assert caption == expected
+    assert caption.split("\n") == [
+        "POTHYS SWARNA MAHAL",
+        "Daily New Enrollment Report — 26/10/2026",
+    ]
+
+
+def test_caption_exact_scheme_rejoining_report_26_oct():
+    """Verify exact two-line caption for Scheme Rejoining Report on 26/10/2026."""
+    caption = format_telegram_caption(
+        report_date=date(2026, 10, 26),
+        report_title="Scheme Rejoining Report",
+    )
+    expected = "POTHYS SWARNA MAHAL\nDaily Scheme Rejoining Report — 26/10/2026"
+    assert caption == expected
+    assert caption.split("\n") == [
+        "POTHYS SWARNA MAHAL",
+        "Daily Scheme Rejoining Report — 26/10/2026",
+    ]
+
+
+def test_caption_removes_all_emojis_metrics_separators_and_footers():
+    """
+    Verify that no emoji, metrics (count, revenue, rejoining %), separators,
+    or confidentiality footer remain in either caption.
+    """
+    caption_enr = format_telegram_caption(
+        report_date=date(2026, 10, 26),
+        report_title="New Enrollment Report",
+        enrollment_total=30737,
+        notes="Revenue: INR 354,754,611.00",
+    )
+    caption_cl = format_telegram_caption(
+        report_date=date(2026, 10, 26),
+        report_title="Scheme Rejoining Report",
+        closing_total=4780,
+        rejoining_rate_pct=20.86,
+        notes="Closed Weight: 34204.01g",
+    )
+
+    for cap in (caption_enr, caption_cl):
+        # Must be exactly 2 lines
+        lines = cap.split("\n")
+        assert len(lines) == 2
+        # No emojis
+        assert "📊" not in cap
+        assert "🔒" not in cap
+        assert "ℹ️" not in cap
+        assert "•" not in cap
+        # No separators
+        assert "━" not in cap
+        assert "---" not in cap
+        # No confidentiality footer
+        assert "Confidential" not in cap
+        assert "Internal Management Distribution" not in cap
+        # No metric lines
+        assert "New Scheme Enrollments" not in cap
+        assert "Scheme Closures" not in cap
+        assert "Overall Rejoining Rate" not in cap
+        assert "30737" not in cap
+        assert "4780" not in cap
+        assert "20.86%" not in cap
+        assert "Revenue" not in cap
+        assert "Closed Weight" not in cap
+
+
+def test_caption_dynamic_date_generation():
+    """Verify date is generated dynamically from report_date parameter."""
+    cap1 = format_telegram_caption(report_date=date(2026, 10, 25), report_title="New Enrollment Report")
+    assert cap1.endswith("25/10/2026")
+
+    cap2 = format_telegram_caption(report_date=date(2026, 10, 26), report_title="New Enrollment Report")
+    assert cap2.endswith("26/10/2026")
+
+    cap3 = format_telegram_caption(report_date=date(2026, 11, 4), report_title="Scheme Rejoining Report")
+    assert cap3.endswith("04/11/2026")
+
 
 
 def test_cli_send_telegram_disabled_fails(monkeypatch):

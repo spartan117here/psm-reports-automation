@@ -52,6 +52,7 @@ class ValidationStatus(str, Enum):
     PASSED = "PASSED"
     WARNING = "WARNING"
     FAILED = "FAILED"
+    PENDING = "PENDING"
 
 
 class ValidationResult(BaseModel):
@@ -113,6 +114,10 @@ class RunContext(BaseModel):
     current_stage: PipelineStage = PipelineStage.INIT
 
 
+# Helper union alias for Showrooms parameter
+Union_Showrooms = Any
+
+
 class ReportFilterParams(BaseModel):
     """Parameters required to construct an Innervex report request payload."""
     action: str = "FindSchemeTransactionReport"
@@ -124,10 +129,6 @@ class ReportFilterParams(BaseModel):
     emp_code: str = "All"
     promo_code: str = "All"
     export_mode: str = "EXPORT"
-
-
-# Helper union alias for Showrooms parameter
-Union_Showrooms = Any
 
 
 class RawReportPayload(BaseModel):

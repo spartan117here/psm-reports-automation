@@ -1,0 +1,31 @@
+{
+  "test_name": "TEST 6 \u2014 DG/DS AUTHENTICATION AUDIT",
+  "timestamp_utc": "2026-10-27T06:22:50.920185+00:00",
+  "configuration_inspection": {
+    "GOOGLE_SERVICE_ACCOUNT_PATH": {
+      "configured": true,
+      "target_path": "secrets/service_account.json",
+      "file_exists": false
+    },
+    "GOOGLE_APPLICATION_CREDENTIALS": {
+      "configured": false,
+      "target_path": null,
+      "file_exists": false
+    },
+    "GOOGLE_SERVICE_ACCOUNT_JSON": {
+      "configured": false
+    },
+    "APPLICATION_DEFAULT_CREDENTIALS_ADC": {
+      "available": false,
+      "error_detail": "DefaultCredentialsError: Your default credentials were not found. To set up Application Default Credentials, see https://cloud.google.com/docs/authentication/external/set-up-adc for more information."
+    },
+    "DIGI_SPREADSHEET_ID": {
+      "configured": true,
+      "spreadsheet_id_masked": "1N-4...8j2U"
+    }
+  },
+  "dg_ds_status": "BLOCKED",
+  "root_cause": "The environment specifies GOOGLE_SERVICE_ACCOUNT_PATH=secrets/service_account.json, but the directory 'secrets/' is empty. The private Digi workbook returns HTTP 401 to unauthenticated requests. No synthetic/mock data was fabricated in lieu of authentic records.",
+  "remediation_action": "Place an authorized Google Service Account key file at 'secrets/service_account.json' with read-only permissions for the Digi workbook.",
+  "overall_status": "BLOCKED"
+}

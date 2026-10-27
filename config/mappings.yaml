@@ -15,6 +15,7 @@ employee_to_branch:
   CBE: "COIMBATORE"
   TRI: "TRICHY"
   TPJ: "TRICHY"
+  NGL: "NAGERCOIL"
 
 # Confirmed 31 showroom codes from Innervex defaultLoad
 showroom_codes:

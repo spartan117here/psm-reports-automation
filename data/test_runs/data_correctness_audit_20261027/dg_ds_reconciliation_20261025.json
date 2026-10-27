@@ -1,0 +1,127 @@
+{
+  "report_date": "2026-10-25",
+  "audit_timestamp": "2026-10-27",
+  "source_spreadsheet_title": "DiGi Gold New Member - Storewise (FY 26 -27)",
+  "source_freshness": {
+    "max_schdate": "2026-10-26",
+    "records_for_report_date": 1029,
+    "status": "PASS"
+  },
+  "daily_reconciliation": {
+    "total_raw_rows": 1029,
+    "unique_client_ids": 1029,
+    "duplicates": 0,
+    "digi_gold": {
+      "count": 878,
+      "received_amount": 604924.0,
+      "registered_amount": 355688.0,
+      "promo_amount": 114000.0,
+      "branch_breakdown": {
+        "ONLINE": 177,
+        "SALEM": 50,
+        "PADI": 64,
+        "NAGERCOIL": 101,
+        "CHROMEPET": 92,
+        "POTHYS TRADITIONAL": 14,
+        "NELLAI": 30,
+        "POONAMALLEE": 13,
+        "CORPORATE OFFICE": 5,
+        "TRIVANDRUM": 54,
+        "KANCHEEPURAM": 114,
+        "COIMBATORE": 73,
+        "TRICHY": 90,
+        "POTHYS CHROMPET": 1
+      },
+      "pivot_match": true
+    },
+    "digi_silver": {
+      "count": 151,
+      "received_amount": 164302.0,
+      "registered_amount": 135712.0,
+      "promo_amount": 5400.0,
+      "branch_breakdown": {
+        "ONLINE": 44,
+        "PADI": 16,
+        "PADI TEXTILES": 1,
+        "POONAMALLEE": 5,
+        "CHROMEPET": 13,
+        "NELLAI": 4,
+        "KANCHEEPURAM": 12,
+        "NAGERCOIL": 3,
+        "TRICHY": 15,
+        "COIMBATORE": 19,
+        "SALEM": 17,
+        "TRIVANDRUM": 1,
+        "CORPORATE OFFICE": 1
+      },
+      "pivot_match": true
+    },
+    "combined": {
+      "count": 1029,
+      "received_amount": 769226.0,
+      "registered_amount": 491400.0,
+      "promo_amount": 119400.0
+    },
+    "channel_attribution": {
+      "nagercoil": {
+        "gold_count": 101,
+        "gold_amount": 58500.0,
+        "silver_count": 3,
+        "silver_amount": 300.0,
+        "total_count": 104,
+        "total_amount": 58800.0
+      },
+      "kanchi": {
+        "gold_count": 114,
+        "gold_amount": 101842.0,
+        "silver_count": 12,
+        "silver_amount": 4400.0,
+        "total_count": 126,
+        "total_amount": 106242.0
+      },
+      "online": {
+        "gold_count": 177,
+        "gold_amount": 214713.0,
+        "silver_count": 44,
+        "silver_amount": 66560.0,
+        "total_count": 221,
+        "total_amount": 281273.0
+      }
+    }
+  },
+  "cumulative_mtd_pivot": {
+    "pivot_date_header": "2026-10-26",
+    "gold_showroom_subtotal": 14614,
+    "silver_showroom_subtotal": 3792,
+    "gold_ecommerce": 5179,
+    "silver_ecommerce": 963,
+    "gold_values_11_entities": {
+      "NELLAI": 824,
+      "CHROMEPET": 1985,
+      "TRIVANDRUM": 1863,
+      "TRICHY": 1876,
+      "COIMBATORE": 2070,
+      "SALEM": 1280,
+      "POONAMALLEE": 464,
+      "PADI": 1506,
+      "KANCHEEPURAM": 2746,
+      "NAGERCOIL": 143,
+      "ECOMMERCE": 5179
+    },
+    "silver_values_11_entities": {
+      "NELLAI": 385,
+      "CHROMEPET": 373,
+      "TRIVANDRUM": 46,
+      "TRICHY": 685,
+      "COIMBATORE": 961,
+      "SALEM": 452,
+      "POONAMALLEE": 155,
+      "PADI": 357,
+      "KANCHEEPURAM": 378,
+      "NAGERCOIL": 3,
+      "ECOMMERCE": 963
+    },
+    "math_reconciliation": "PASS"
+  },
+  "overall_dg_ds_status": "PASS"
+}

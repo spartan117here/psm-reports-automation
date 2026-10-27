@@ -1,0 +1,28 @@
+{
+  "test_name": "TEST 5 \u2014 IDEMPOTENCY AND RECOVERY",
+  "timestamp_utc": "2026-10-27T06:22:38.306345+00:00",
+  "single_day_double_run": {
+    "run1_appended_count": 317,
+    "run2_appended_count": 0,
+    "run2_skipped_duplicates_count": 317,
+    "zero_duplicates_appended": true,
+    "pass": true
+  },
+  "multi_day_catchup_recovery": {
+    "day1_rows_appended": 173,
+    "day2_rows_appended": 219,
+    "catchup_batch_additional_appended": 0,
+    "catchup_batch_skipped_as_duplicates": 392,
+    "zero_double_counting": true,
+    "pass": true
+  },
+  "run_repository_idempotency": {
+    "registered_completed_run": "RUN-TEST-20261025-001",
+    "detected_as_already_processed": true,
+    "pass": true
+  },
+  "findings": {
+    "mock_client_bug_documented": "MockGoogleSheetsService.get_existing_column_values had an upstream mock bug: it passed hardcoded 'MOCK_SPREADSHEET' and checked r[0] (COSTNAME) instead of column_letter (MSNO). In AuditMockSheetsService this was isolated and corrected, confirming SheetWriter.append_rows_idempotently cleanly achieves 100% deduplication."
+  },
+  "overall_status": "PASS"
+}

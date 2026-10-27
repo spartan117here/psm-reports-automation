@@ -1,0 +1,57 @@
+{
+  "report_date": "2026-10-26",
+  "execution_timestamp": "2026-10-27T16:46:26.609163",
+  "strict_read_only": true,
+  "revenue_totals": {
+    "target": 313000000.0,
+    "subhiksham": 36872500.0,
+    "viruksham": 317882111.0,
+    "total_achieved": 354754611.0
+  },
+  "count_totals": {
+    "target": 36000,
+    "subhiksham": 5053,
+    "viruksham": 990,
+    "digi_gold": 19936,
+    "digi_silver": 4758,
+    "total_all": 30737,
+    "avg_per_day": 1182
+  },
+  "rejoining_totals": {
+    "closed_count": 4780,
+    "rejoin_ss": 910,
+    "rejoin_sv": 87,
+    "total_rejoin": 997,
+    "rejoin_percentage": 20.86,
+    "closed_weight_grams": 34204.01,
+    "closed_ss_count": 4089,
+    "closed_sv_count": 691
+  },
+  "gate_status": "PASS",
+  "gate_is_safe": true,
+  "screenshots": {
+    "enrollment": {
+      "path": "C:\\Users\\spart\\OneDrive\\Documents\\psm-reports-automation-main\\data\\test_runs\\report_2026-10-26\\screenshots\\New_Enrollment_Report_2026-10-26.png",
+      "dimensions": [
+        1462,
+        1244
+      ],
+      "size_bytes": 284754,
+      "range": "E3:L33",
+      "delivery_status": "SENT",
+      "delivery_message_id": "tg_6"
+    },
+    "closing": {
+      "path": "C:\\Users\\spart\\OneDrive\\Documents\\psm-reports-automation-main\\data\\test_runs\\report_2026-10-26\\screenshots\\Scheme_Rejoining_Report_2026-10-26.png",
+      "dimensions": [
+        1243,
+        1152
+      ],
+      "size_bytes": 142969,
+      "range": "L2:Q25",
+      "delivery_status": "SENT",
+      "delivery_message_id": "tg_7"
+    }
+  },
+  "reference_comparison_status": "PENDING REFERENCE"
+}

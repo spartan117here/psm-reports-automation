@@ -19,7 +19,8 @@ REQUIRED_FIELDS = ("COSTNAME", "CLIENTID", "GROUPCODE", "MSNO", "NAME", "SCHDATE
 def normalize_date_str(val: Any) -> Optional[str]:
     """
     Normalize SCHDATE to ISO YYYY-MM-DD representation while preserving the business date.
-    Supports DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, etc.
+    Supports DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, DD/MM/YY, DD-MM-YY, etc.
+    Returns None if date parsing fails, preventing invalid dates from silently passing.
     """
     if val is None:
         return None
@@ -27,13 +28,25 @@ def normalize_date_str(val: Any) -> Optional[str]:
     if not s:
         return None
 
-    for fmt in ("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y"):
+    for fmt in (
+        "%Y-%m-%d",
+        "%d-%m-%Y",
+        "%d/%m/%Y",
+        "%Y/%m/%d",
+        "%d.%m.%Y",
+        "%d/%m/%y",
+        "%d-%m-%y",
+        "%m/%d/%Y",
+        "%m-%d-%Y",
+    ):
         try:
             return datetime.strptime(s, fmt).date().isoformat()
         except ValueError:
             continue
-    # If parsing as standard date fails, return stripped string
-    return s
+    # If parsing as standard date fails, return None so validation flags it
+    logger.warning(f"Failed to parse date value: '{val}'")
+    return None
+
 
 
 def normalize_identifier(val: Any) -> Optional[str]:
@@ -166,8 +179,19 @@ class SchemeReportCleaner:
                 is_valid = False
                 blank_required_field_count += 1
 
+            # Validate date cutoff: future-dated records relative to report cutoff are invalid
+            if schdate and report_date:
+                try:
+                    rec_dt = datetime.strptime(schdate, "%Y-%m-%d").date()
+                    if rec_dt > report_date:
+                        is_valid = False
+                        row_errors.append(f"Future-dated record relative to report date cutoff {report_date}: {schdate}")
+                except ValueError:
+                    pass
+
             if not is_valid:
                 invalid_count += 1
+
 
             # Track aggregations by COSTNAME
             c_key = costname or "UNKNOWN"

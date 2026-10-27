@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-10-27T17:53:18.624010",
+  "report_date": "2026-10-26",
+  "action": "RESEND_DELIVERY_VERIFICATION",
+  "strict_read_only": true,
+  "screenshots": {
+    "new_enrollment": {
+      "path": "C:\\Users\\spart\\OneDrive\\Documents\\psm-reports-automation-main\\data\\test_runs\\report_2026-10-26\\screenshots\\New_Enrollment_Report_2026-10-26.png",
+      "caption": "POTHYS SWARNA MAHAL\nDaily New Enrollment Report \u2014 26/10/2026",
+      "status": "SENT",
+      "message_id": "tg_8",
+      "sha256": "6cd3ab9f6cd709a7cf5f35c4fe0b2ba9a35e38b87d3294c2becae4722c5bfbbf"
+    },
+    "scheme_rejoining": {
+      "path": "C:\\Users\\spart\\OneDrive\\Documents\\psm-reports-automation-main\\data\\test_runs\\report_2026-10-26\\screenshots\\Scheme_Rejoining_Report_2026-10-26.png",
+      "caption": "POTHYS SWARNA MAHAL\nDaily Scheme Rejoining Report \u2014 26/10/2026",
+      "status": "SENT",
+      "message_id": "tg_9",
+      "sha256": "d5693936a28e31d6f8e84ae6824fd00e4d1f513479390db2ea9185c4b0ac9a14"
+    }
+  }
+}

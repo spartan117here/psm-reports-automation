@@ -1,0 +1,56 @@
+{
+  "test_name": "TEST 1 \u2014 SINGLE-DAY INPUT",
+  "target_date": "2026-10-25",
+  "timestamp_utc": "2026-10-27T06:22:18.768583+00:00",
+  "datasets": {
+    "subhiksham": {
+      "source_row_count": 317,
+      "unique_msno_count": 317,
+      "all_dates_match_target": true,
+      "dates_found_normalized": [
+        "2026-10-25"
+      ],
+      "raw_date_sample": [
+        "25-10-2026",
+        "25-10-2026",
+        "25-10-2026"
+      ],
+      "total_recamount": 2839000.0,
+      "records_missing_required_fields": 0,
+      "extraction_complete": true
+    },
+    "viruksham": {
+      "source_row_count": 72,
+      "unique_msno_count": 72,
+      "all_dates_match_target": true,
+      "dates_found_normalized": [
+        "2026-10-25"
+      ],
+      "raw_date_sample": [
+        "25-10-2026",
+        "25-10-2026",
+        "25-10-2026"
+      ],
+      "total_recamount": 21511494.0,
+      "records_missing_required_fields": 0,
+      "extraction_complete": true
+    },
+    "closing": {
+      "source_row_count": 333,
+      "unique_docno_count": 234,
+      "all_dates_match_target": true,
+      "dates_found_normalized": [
+        "2026-10-25"
+      ],
+      "raw_date_sample": [
+        "25-10-2026",
+        "25-10-2026",
+        "25-10-2026"
+      ],
+      "total_weight_grams": 2542.698,
+      "records_missing_required_fields": 0,
+      "extraction_complete": true
+    }
+  },
+  "overall_status": "PASS"
+}

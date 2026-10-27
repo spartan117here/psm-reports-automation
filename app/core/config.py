@@ -77,6 +77,7 @@ class TelegramConfig(BaseModel):
 
 class DigiScheduleConfig(BaseModel):
     start_time: str = "11:00"
+    readiness_deadline: str = "11:30"
     cutoff_time: str = "12:30"
     retry_interval_minutes: int = 15
     max_retries: int = 6
@@ -233,10 +234,13 @@ def load_config(project_root: Optional[Path] = None) -> AppConfigBundle:
         # Defaults to parent directory of app/
         project_root = Path(__file__).resolve().parent.parent.parent
 
-    # Load environment variables from .env if present
+    # Load environment variables from .env if present (root and scripts/ fallback)
     env_file = project_root / ".env"
     if env_file.is_file():
         load_dotenv(dotenv_path=env_file)
+    scripts_env = project_root / "scripts" / ".env"
+    if scripts_env.is_file():
+        load_dotenv(dotenv_path=scripts_env)
 
     config_dir = project_root / "config"
 

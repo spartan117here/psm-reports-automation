@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 import sys
-from typing import Optional
+from typing import Any, Optional
 
 from app.core.config import load_config
 from app.core.logging import setup_logger
@@ -2175,7 +2175,7 @@ def cmd_send_telegram(args: argparse.Namespace) -> int:
 
     caption = format_telegram_caption(
         report_date=target_date,
-        report_title="Enrollment Performance Report" if "enrollment" in target_type else "Executive Report",
+        report_title="New Enrollment Report" if "enrollment" in target_type else "Scheme Rejoining Report",
     )
 
     receipt = channel.send_photo(

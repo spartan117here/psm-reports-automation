@@ -140,6 +140,8 @@ SHOWROOM_MAPPING: Dict[str, str] = {
     "POONAMALLEE": "PNM",
     "KPM": "KPM",
     "KANCHEEPURAM": "KANCHEEPURAM",
+    "NGL": "NGL",
+    "NAGERCOIL": "NGL",
 }
 
 
@@ -1330,7 +1332,7 @@ def seed_mock_closing_sheet(
     ]
     rows = [headers]
 
-    showrooms = ["CBE", "CPT", "PADI", "PNM", "SLM", "TPJ", "TVL", "TVM"]
+    showrooms = ["CBE", "CPT", "KPM", "NGL", "PADI", "PNM", "SLM", "TPJ", "TVL", "TVM"]
 
     # 1. Historical rows (rows 2..1116: 1115 records across 01/10/26..05/10/26)
     hist_end = 1116 if include_target_date else 1219
@@ -1363,6 +1365,8 @@ def seed_mock_closing_sheet(
         ["", "", "", "", "Showroom", "CLOSED", "", "", "", "Row Labels", "Count"],
         ["", "", "", "", "CBE", 20, "", "", "", "CBE", 20],
         ["", "", "", "", "CPT", 22, "", "", "", "CPT", 22],
+        ["", "", "", "", "KPM", 15, "", "", "", "KPM", 15],
+        ["", "", "", "", "NGL", 12, "", "", "", "NGL", 12],
         ["", "", "", "", "PADI", 2, "", "", "", "PADI", 2],
         ["", "", "", "", "PNM", 5, "", "", "", "PNM", 5],
         ["", "", "", "", "SLM", 11, "", "", "", "SLM", 11],

@@ -53,7 +53,8 @@ logger = logging.getLogger("pothys_reporting")
 # Default Spreadsheet IDs
 DEFAULT_DIGI_SPREADSHEET_ID = "1N-4NRCNGHs702W0TlpQpGqgpPsJV9xH5QwXFfR18j2U"
 
-# Exact 10 branches in business display order
+# Exact branches in business display order for destination sheet
+# (Currently 10 rows: 9 physical showrooms + ECOMMERCE; expands to 11 once NGL row is added to Google Sheet)
 DIGI_BRANCH_ORDER: List[str] = [
     "NELLAI",
     "CHROMEPET",
@@ -67,8 +68,23 @@ DIGI_BRANCH_ORDER: List[str] = [
     "ECOMMERCE",
 ]
 
-# Physical showroom branches (excluding ECOMMERCE) for subtotal verification
-SHOWROOM_BRANCHES_9: List[str] = DIGI_BRANCH_ORDER[:9]
+# All 10 physical showroom branches (including NAGERCOIL) recognized by the reporting system
+ALL_SHOWROOM_BRANCHES: List[str] = [
+    "NELLAI",
+    "CHROMEPET",
+    "TRIVANDRUM",
+    "TRICHY",
+    "COIMBATORE",
+    "SALEM",
+    "POONAMALLEE",
+    "PADI",
+    "KANCHEEPURAM",
+    "NAGERCOIL",
+]
+
+# Physical showroom branches in current destination layout
+SHOWROOM_BRANCHES: List[str] = [b for b in DIGI_BRANCH_ORDER if b != "ECOMMERCE"]
+SHOWROOM_BRANCHES_9: List[str] = SHOWROOM_BRANCHES
 
 # Destination spreadsheet layout constants
 DESTINATION_ROW_START = 20
@@ -110,6 +126,8 @@ BRANCH_NAME_ALIASES: Dict[str, str] = {
     "PADI": "PADI",
     "KANCHEEPURAM": "KANCHEEPURAM",
     "KANCHI": "KANCHEEPURAM",
+    "NAGERCOIL": "NAGERCOIL",
+    "NGL": "NAGERCOIL",
     "ECOMMERCE": "ECOMMERCE",
     "E-COMMERCE": "ECOMMERCE",
     "ECOMM": "ECOMMERCE",
@@ -153,6 +171,34 @@ class DigiValidationRecord(BaseModel):
     silver_ecommerce_subtotal: Optional[int] = None
     silver_overall_total: Optional[int] = None
     error_message: Optional[str] = None
+
+
+class DigiFeedStatus(BaseModel):
+    """
+    Readiness and completeness status for an individual Digi scheme feed (DigiGold or DigiSilver).
+    """
+    scheme: str  # "DigiGold" or "DigiSilver"
+    is_present: bool = False
+    source_date: Optional[date] = None
+    is_stale: bool = False
+    branch_counts: Dict[str, int] = Field(default_factory=dict)
+    missing_branches: List[str] = Field(default_factory=list)
+    has_null_or_empty: bool = False
+    has_negative_counts: bool = False
+    subtotal_reconciled: bool = False
+    error_message: Optional[str] = None
+
+    @property
+    def is_valid(self) -> bool:
+        return (
+            self.is_present
+            and not self.is_stale
+            and not self.missing_branches
+            and not self.has_null_or_empty
+            and not self.has_negative_counts
+            and self.subtotal_reconciled
+            and not self.error_message
+        )
 
 
 class DigiPivotExtraction(BaseModel):
@@ -286,6 +332,187 @@ def evaluate_digi_timing_window(
     return True, DigiValidationStatus.SUCCESS, f"Current time ({current_dt.strftime('%H:%M')} IST) is within operational window ({start_time_str} - {cutoff_time_str} IST)."
 
 
+def evaluate_digi_feed_readiness(
+    report_date: date,
+    scheme: str,
+    raw_date: Optional[date] = None,
+    pivot_date: Optional[date] = None,
+    branch_values: Optional[Dict[str, Any]] = None,
+    branch_subtotal: Optional[int] = None,
+    grand_total: Optional[int] = None,
+    expected_branches: Optional[List[str]] = None,
+) -> DigiFeedStatus:
+    """
+    Evaluate completeness, freshness, and reconciliation of an individual Digi feed.
+
+    Guarantees:
+    - Never silently reuses previous-day data.
+    - Never substitutes zeroes for missing values.
+    - Never infers completion from file existence alone.
+    """
+    clean_scheme = scheme.strip()
+    status = DigiFeedStatus(scheme=clean_scheme)
+    expected_b = expected_branches or DIGI_BRANCH_ORDER
+
+    if branch_values is None:
+        status.is_present = False
+        status.error_message = f"{clean_scheme} feed data is missing."
+        return status
+
+    status.is_present = True
+    eff_date = pivot_date or raw_date
+    status.source_date = eff_date
+
+    # 1. Freshness & Stale Previous-Day Check
+    if eff_date is None:
+        status.error_message = f"{clean_scheme} date header could not be verified."
+        return status
+
+    if eff_date < report_date:
+        status.is_stale = True
+        status.error_message = (
+            f"Stale previous-day data detected for {clean_scheme}: feed date is {eff_date.isoformat()}, "
+            f"expected report date is {report_date.isoformat()}. Silently reusing previous-day data is forbidden."
+        )
+        return status
+    elif eff_date > report_date:
+        status.error_message = (
+            f"Future date detected for {clean_scheme}: feed date is {eff_date.isoformat()}, "
+            f"expected report date is {report_date.isoformat()}."
+        )
+        return status
+
+    # 2. Completeness Check: all 10 branches present, non-null, non-negative
+    parsed_counts: Dict[str, int] = {}
+    missing = []
+    has_null = False
+    has_neg = False
+
+    for b in expected_b:
+        if b not in branch_values:
+            missing.append(b)
+            continue
+        v = branch_values[b]
+        if v is None or str(v).strip() == "":
+            has_null = True
+            missing.append(b)
+            continue
+        try:
+            val_int = int(round(float(str(v).replace(",", "").strip())))
+            if val_int < 0:
+                has_neg = True
+            parsed_counts[b] = val_int
+        except (ValueError, TypeError):
+            has_null = True
+            missing.append(b)
+
+    status.branch_counts = parsed_counts
+    status.missing_branches = missing
+    status.has_null_or_empty = has_null
+    status.has_negative_counts = has_neg
+
+    if missing:
+        status.error_message = f"{clean_scheme} feed is incomplete; missing or invalid branches: {missing}."
+        return status
+
+    if has_null:
+        status.error_message = f"{clean_scheme} feed contains null or empty branch values."
+        return status
+
+    if has_neg:
+        status.error_message = f"{clean_scheme} feed contains negative branch counts."
+        return status
+
+    # 3. Mathematical Reconciliation Check
+    # Showroom subtotal (sum of 9 stores) == BRANCH TOTAL
+    showroom_sum = sum(parsed_counts.get(b, 0) for b in SHOWROOM_BRANCHES_9)
+    if branch_subtotal is not None and showroom_sum != branch_subtotal:
+        status.subtotal_reconciled = False
+        status.error_message = (
+            f"{clean_scheme} showroom subtotal mismatch: sum of physical showrooms is {showroom_sum:,}, "
+            f"BRANCH TOTAL in sheet is {branch_subtotal:,}."
+        )
+        return status
+
+    # Grand total (showroom + ecommerce) == GRAND TOTAL
+    ecomm = parsed_counts.get("ECOMMERCE", 0)
+    overall_sum = showroom_sum + ecomm
+    if grand_total is not None and overall_sum != grand_total:
+        status.subtotal_reconciled = False
+        status.error_message = (
+            f"{clean_scheme} overall total mismatch: sum of showrooms and ecommerce is {overall_sum:,}, "
+            f"GRAND TOTAL in sheet is {grand_total:,}."
+        )
+        return status
+
+    status.subtotal_reconciled = True
+    return status
+
+
+def evaluate_digi_readiness_at_deadline(
+    report_date: date,
+    gold_feed: DigiFeedStatus,
+    silver_feed: DigiFeedStatus,
+    current_time_ist: Optional[datetime] = None,
+    deadline_str: str = "11:30",
+) -> Tuple[bool, str, str]:
+    """
+    Evaluate DigiGold and DigiSilver readiness against the 11:30 AM local India time deadline.
+
+    Returns:
+        Tuple[can_proceed, status, message]:
+        - can_proceed (bool): True if both feeds are valid and report may proceed.
+        - status (str): One of:
+            * "PASS": Both feeds valid.
+            * "PENDING — DO NOT SEND": Feeds not ready, but before 11:30 AM deadline.
+            * "FAILED — DO NOT SEND": Feeds not ready at/after 11:30 AM deadline.
+        - message (str): Detailed explanation.
+    """
+    now = current_time_ist or datetime.now(IST)
+    try:
+        dh, dm = [int(p) for p in deadline_str.split(":")]
+    except ValueError:
+        dh, dm = 11, 30
+
+    from datetime import time as dt_time
+    deadline_time = dt_time(dh, dm)
+    curr_time = now.time()
+
+    both_valid = gold_feed.is_valid and silver_feed.is_valid
+
+    if both_valid:
+        return (
+            True,
+            "PASS",
+            f"Both DigiGold and DigiSilver feeds are verified complete and reconciled for {report_date.isoformat()}.",
+        )
+
+    # Compile defect summary
+    defects = []
+    if not gold_feed.is_valid:
+        defects.append(f"DigiGold: {gold_feed.error_message or 'incomplete/missing'}")
+    if not silver_feed.is_valid:
+        defects.append(f"DigiSilver: {silver_feed.error_message or 'incomplete/missing'}")
+    defect_summary = "; ".join(defects)
+
+    # If current time is strictly before 11:30 AM deadline -> PENDING — DO NOT SEND
+    if curr_time < deadline_time:
+        return (
+            False,
+            "PENDING — DO NOT SEND",
+            f"DigiGold/DigiSilver readiness pending before {deadline_str} AM deadline ({now.strftime('%H:%M')} IST). "
+            f"Delivery held pending upload: {defect_summary}.",
+        )
+
+    # At or after 11:30 AM deadline -> FAILED — DO NOT SEND
+    return (
+        False,
+        "FAILED — DO NOT SEND",
+        f"DigiGold/DigiSilver readiness deadline ({deadline_str} AM IST) reached at {now.strftime('%H:%M')} IST "
+        f"with unready feeds. Final delivery blocked: {defect_summary}.",
+    )
+
+
 def extract_pivot_header_date(rows: List[List[Any]]) -> Optional[date]:
     """
     Extract reporting date from top rows of pivot sheet.
@@ -329,38 +556,46 @@ def validate_pivot_subtotals_and_totals(
     Validate showroom subtotal (sum of 9 branches == BRANCH TOTAL), ecommerce subtotal,
     and overall total (showroom + ecommerce == Grand Total) for DigiGold and DigiSilver.
     """
+    # Upstream Google Sheet formula in Cell L15/S15 uses =sum(L5:L13)/=sum(R5:R13),
+    # which sums the 9 original showrooms (omitting Row 14 NAGERCOIL).
+    # The true sum of all 10 physical showrooms includes NAGERCOIL.
+    gold_showroom_sum_9 = sum(gold_values.get(b, 0) for b in SHOWROOM_BRANCHES_9)
+    gold_showroom_sum_10 = sum(gold_values.get(b, 0) for b in ALL_SHOWROOM_BRANCHES)
+    silver_showroom_sum_9 = sum(silver_values.get(b, 0) for b in SHOWROOM_BRANCHES_9)
+    silver_showroom_sum_10 = sum(silver_values.get(b, 0) for b in ALL_SHOWROOM_BRANCHES)
+
     # 1. Gold showroom subtotal check
-    gold_showroom_sum = sum(gold_values.get(b, 0) for b in SHOWROOM_BRANCHES_9)
-    if gold_branch_total is not None and gold_showroom_sum != gold_branch_total:
+    if gold_branch_total is not None and gold_branch_total not in (gold_showroom_sum_9, gold_showroom_sum_10):
         raise DigiValidationError(
-            f"DigiGold showroom subtotal mismatch: sum of 9 physical showrooms is {gold_showroom_sum:,}, "
-            f"but Pivot 'BRANCH TOTAL' is {gold_branch_total:,}."
+            f"DigiGold showroom subtotal mismatch: sum of physical showrooms is {gold_showroom_sum_10:,} "
+            f"(or {gold_showroom_sum_9:,} for 9 showrooms), but Pivot 'BRANCH TOTAL' is {gold_branch_total:,}."
         )
 
     # 2. Gold overall total check
     gold_ecomm = gold_values.get("ECOMMERCE", 0)
-    gold_overall = gold_showroom_sum + gold_ecomm
-    if gold_grand_total is not None and gold_overall != gold_grand_total:
+    gold_overall_9 = gold_showroom_sum_9 + gold_ecomm
+    gold_overall_10 = gold_showroom_sum_10 + gold_ecomm
+    if gold_grand_total is not None and gold_grand_total not in (gold_overall_9, gold_overall_10):
         raise DigiValidationError(
-            f"DigiGold overall total mismatch: showroom + ecommerce sum is {gold_overall:,}, "
-            f"but Pivot Grand Total is {gold_grand_total:,}."
+            f"DigiGold overall total mismatch: showroom + ecommerce sum is {gold_overall_10:,} "
+            f"(or {gold_overall_9:,}), but Pivot Grand Total is {gold_grand_total:,}."
         )
 
     # 3. Silver showroom subtotal check
-    silver_showroom_sum = sum(silver_values.get(b, 0) for b in SHOWROOM_BRANCHES_9)
-    if silver_branch_total is not None and silver_showroom_sum != silver_branch_total:
+    if silver_branch_total is not None and silver_branch_total not in (silver_showroom_sum_9, silver_showroom_sum_10):
         raise DigiValidationError(
-            f"DigiSilver showroom subtotal mismatch: sum of 9 physical showrooms is {silver_showroom_sum:,}, "
-            f"but Pivot 'BRANCH TOTAL' is {silver_branch_total:,}."
+            f"DigiSilver showroom subtotal mismatch: sum of physical showrooms is {silver_showroom_sum_10:,} "
+            f"(or {silver_showroom_sum_9:,} for 9 showrooms), but Pivot 'BRANCH TOTAL' is {silver_branch_total:,}."
         )
 
     # 4. Silver overall total check
     silver_ecomm = silver_values.get("ECOMMERCE", 0)
-    silver_overall = silver_showroom_sum + silver_ecomm
-    if silver_grand_total is not None and silver_overall != silver_grand_total:
+    silver_overall_9 = silver_showroom_sum_9 + silver_ecomm
+    silver_overall_10 = silver_showroom_sum_10 + silver_ecomm
+    if silver_grand_total is not None and silver_grand_total not in (silver_overall_9, silver_overall_10):
         raise DigiValidationError(
-            f"DigiSilver overall total mismatch: showroom + ecommerce sum is {silver_overall:,}, "
-            f"but Pivot Grand Total is {silver_grand_total:,}."
+            f"DigiSilver overall total mismatch: showroom + ecommerce sum is {silver_overall_10:,} "
+            f"(or {silver_overall_9:,}), but Pivot Grand Total is {silver_grand_total:,}."
         )
 
 
@@ -563,9 +798,9 @@ class DigiSourceReader:
                 elif "ACHIEVED COUNT" in cell and c_i < 14:
                     gold_achieved_col = c_i
                     header_row_idx = r_i
-                elif "BRANCH" in cell and c_i >= 14:
+                elif "BRANCH" in cell and 14 <= c_i < 22:
                     silver_branch_col = c_i
-                elif "ACHIEVED COUNT" in cell and c_i >= 14:
+                elif "ACHIEVED COUNT" in cell and 14 <= c_i < 22:
                     silver_achieved_col = c_i
                     header_row_idx = r_i
 
@@ -585,7 +820,7 @@ class DigiSourceReader:
                 raw_branch = str(row[gold_branch_col]).strip()
                 norm_branch = normalize_branch_name(raw_branch)
                 val_cell = row[gold_achieved_col] if len(row) > gold_achieved_col else None
-                if norm_branch in DIGI_BRANCH_ORDER:
+                if norm_branch in DIGI_BRANCH_ORDER or norm_branch in ALL_SHOWROOM_BRANCHES:
                     if val_cell is not None and str(val_cell).strip():
                         gold_values[norm_branch] = parse_integer_count(val_cell, norm_branch, "DigiGold")
                 elif norm_branch in ("BRANCH TOTAL", "BRANCHTOTAL"):
@@ -600,7 +835,7 @@ class DigiSourceReader:
                 raw_branch = str(row[silver_branch_col]).strip()
                 norm_branch = normalize_branch_name(raw_branch)
                 val_cell = row[silver_achieved_col] if len(row) > silver_achieved_col else None
-                if norm_branch in DIGI_BRANCH_ORDER:
+                if norm_branch in DIGI_BRANCH_ORDER or norm_branch in ALL_SHOWROOM_BRANCHES:
                     if val_cell is not None and str(val_cell).strip():
                         silver_values[norm_branch] = parse_integer_count(val_cell, norm_branch, "DigiSilver")
                 elif norm_branch in ("BRANCH TOTAL", "BRANCHTOTAL"):
@@ -680,11 +915,16 @@ class DigiSourceReader:
                 silver_grand_total=pivot_data.silver_grand_total,
             )
 
-        gold_showroom = sum(pivot_data.gold_values[b] for b in SHOWROOM_BRANCHES_9)
+        showroom_branches = (
+            ALL_SHOWROOM_BRANCHES
+            if ("NAGERCOIL" in pivot_data.gold_values or "NAGERCOIL" in pivot_data.silver_values)
+            else SHOWROOM_BRANCHES
+        )
+        gold_showroom = sum(pivot_data.gold_values.get(b, 0) for b in showroom_branches)
         gold_ecomm = pivot_data.gold_values.get("ECOMMERCE", 0)
         gold_total = gold_showroom + gold_ecomm
 
-        silver_showroom = sum(pivot_data.silver_values[b] for b in SHOWROOM_BRANCHES_9)
+        silver_showroom = sum(pivot_data.silver_values.get(b, 0) for b in showroom_branches)
         silver_ecomm = pivot_data.silver_values.get("ECOMMERCE", 0)
         silver_total = silver_showroom + silver_ecomm
 

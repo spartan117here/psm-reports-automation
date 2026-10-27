@@ -114,7 +114,7 @@ def test_attachment_validation_oversized_file(tmp_path: Path, monkeypatch):
 
     # Mock stat to return size > limit
     monkeypatch.setattr(
-        Path, "stat", lambda self: type("Stat", (), {"st_size": MAX_ATTACHMENT_SIZE_BYTES + 100})()
+        Path, "stat", lambda self, *args, **kwargs: type("Stat", (), {"st_size": MAX_ATTACHMENT_SIZE_BYTES + 100, "st_mode": 0o100644})()
     )
     with pytest.raises(ValueError, match="exceeds"):
         validate_attachment(test_img)

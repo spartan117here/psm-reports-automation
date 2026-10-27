@@ -65,9 +65,14 @@ Write-Log "Execution Mode:    $($Mode.ToUpper())"
 Write-Log "Pipeline Phase:    $($Phase.ToUpper())"
 
 # 2. Locate Python Executable
-$PythonExe = (Get-Command "python" -ErrorAction SilentlyContinue).Source
+$VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
+if (Test-Path $VenvPython) {
+    $PythonExe = $VenvPython
+} else {
+    $PythonExe = (Get-Command "python" -ErrorAction SilentlyContinue).Source
+}
 if (-not $PythonExe) {
-    Write-Log "CRITICAL: Python executable not found in PATH." "ERROR"
+    Write-Log "CRITICAL: Python executable not found in PATH or .venv." "ERROR"
     exit 1
 }
 Write-Log "Python Executable: $PythonExe"
@@ -75,8 +80,11 @@ Write-Log "Python Executable: $PythonExe"
 # 3. Check Safety Guards for Production Writes
 $StrictReadOnly = [Environment]::GetEnvironmentVariable("STRICT_READ_ONLY")
 if ($StrictReadOnly -eq $null -or $StrictReadOnly -eq "") {
-    # Check .env file if present
+    # Check .env file if present (root or scripts/ directory)
     $EnvPath = Join-Path $ProjectRoot ".env"
+    if (-not (Test-Path $EnvPath)) {
+        $EnvPath = Join-Path $PSScriptRoot ".env"
+    }
     if (Test-Path $EnvPath) {
         $EnvContent = Get-Content $EnvPath
         foreach ($Line in $EnvContent) {

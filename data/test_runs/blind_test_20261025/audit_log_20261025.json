@@ -1,0 +1,210 @@
+{
+  "test_run_metadata": {
+    "test_type": "BLIND_END_TO_END_PIPELINE_TEST",
+    "target_date": "2026-10-25",
+    "run_timestamp": "2026-10-27T11:10:33.005535",
+    "strict_read_only": "true",
+    "production_writes_count": 0,
+    "scheduled_tasks_created": 0,
+    "outbound_messages_sent": 0
+  },
+  "reports_status": {
+    "test_a_enrollment_report": {
+      "subhiksham_ss": "PASS",
+      "viruksham_sv": "PASS",
+      "digi_gold_dg": "BLOCKED",
+      "digi_silver_ds": "BLOCKED",
+      "blocker_reason": "Google Sheets Service Account credentials (secrets/service_account.json) missing. Direct HTTP endpoints require OAuth2 authentication.",
+      "overall_status": "PARTIAL_PASS_WITH_DIGI_BLOCKED"
+    },
+    "test_b_closing_rejoining_report": {
+      "closing_scheme_data": "PASS",
+      "digi_exclusion_check": "PASS",
+      "rejoining_calculation": "PASS",
+      "formula_validation": "PASS",
+      "overall_status": "PASS"
+    }
+  },
+  "source_files": [
+    {
+      "report": "Subhiksham (SS)",
+      "raw_file": "data\\raw\\2026\\10\\25\\innervex_subhiksham_memberlist_2026-10-25.json",
+      "processed_file": "data\\processed\\2026\\10\\25\\subhiksham_memberlist_2026-10-25.csv",
+      "sha256": "5fb2c9dbab9a48641550e8043bf6f7ffaf29a42e769aedd7e60f6fc2f72cd118",
+      "bytes": 38047,
+      "record_count": 317,
+      "dates_found": [
+        "2026-10-25"
+      ],
+      "amount_total_inr": 2839000.0,
+      "date_freshness_verified": true
+    },
+    {
+      "report": "Viruksham (SV)",
+      "raw_file": "data\\raw\\2026\\10\\25\\innervex_viruksham_memberlist_2026-10-25.json",
+      "processed_file": "data\\processed\\2026\\10\\25\\viruksham_memberlist_2026-10-25.csv",
+      "sha256": "4ebeea4e23536a0eb3f2973c0079f1f97b27a91b030bfc887eb45d9de1bf4896",
+      "bytes": 8365,
+      "record_count": 72,
+      "dates_found": [
+        "2026-10-25"
+      ],
+      "amount_total_inr": 21511494.0,
+      "date_freshness_verified": true
+    },
+    {
+      "report": "Scheme Closing Report",
+      "raw_file": "data\\raw\\2026\\10\\25\\SCHEME CLOSING REPORT_2026-10-25.csv",
+      "processed_file": "data\\processed\\2026\\10\\25\\closing_memberlist_2026-10-25.csv",
+      "sha256": "b6031408cde58912c7fc3c7627b80002b6c9134702db394f9cd790ac468f19f4",
+      "bytes": 25185,
+      "record_count": 333,
+      "dates_found": [
+        "25/10/2026"
+      ],
+      "total_weight_g": 2542.698,
+      "date_freshness_verified": true,
+      "digi_gold_excluded": true,
+      "digi_silver_excluded": true,
+      "schemes_present": [
+        "SWARNA VIRUKSHAM",
+        "NEW SWARNA SUBHIKSHAM"
+      ]
+    }
+  ],
+  "unresolved_mappings": {
+    "count": 26,
+    "codes": [
+      "3410",
+      "3432",
+      "3490",
+      "3499",
+      "3501",
+      "3502",
+      "3504",
+      "3505",
+      "3507",
+      "3509",
+      "3512",
+      "3514",
+      "3515",
+      "3516",
+      "3552",
+      "3557",
+      "3566",
+      "3575",
+      "3578",
+      "3582",
+      "3583",
+      "3586",
+      "3589",
+      "3591",
+      "3604",
+      "3613"
+    ],
+    "affected_showroom": "NGL (Nagercoil)",
+    "policy_applied": "FLAG_AND_CONTINUE",
+    "ss_unresolved_records": 40,
+    "ss_unresolved_amount": 287500.0,
+    "sv_unresolved_records": 5,
+    "sv_unresolved_amount": 1724012.0
+  },
+  "rejoining_matches_sample": [
+    {
+      "row_index": 1,
+      "mobile": "9698996954",
+      "name": "ANNALAKSHMI K",
+      "showroom": "TVL",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 2,
+      "mobile": "9342189365",
+      "name": "NOORUL SHAJITHA",
+      "showroom": "TVL",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 14,
+      "mobile": "8593029898",
+      "name": "MARGRET",
+      "showroom": "TVM",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 46,
+      "mobile": "9787518449",
+      "name": "G AKILA",
+      "showroom": "TPJ",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 56,
+      "mobile": "8667589829",
+      "name": "SWATHI S",
+      "showroom": "CBE",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 60,
+      "mobile": "9629175095",
+      "name": "MR.Santhiya",
+      "showroom": "ECOM",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 63,
+      "mobile": "9791350735",
+      "name": "K VADIVEL",
+      "showroom": "CBE",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 73,
+      "mobile": "9495814261",
+      "name": "SABEENA G K",
+      "showroom": "TVM",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 78,
+      "mobile": "9342986289",
+      "name": "V. BALAMURUGAN",
+      "showroom": "TPJ",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    },
+    {
+      "row_index": 86,
+      "mobile": "6380737850",
+      "name": "VEERALAKSHMI S",
+      "showroom": "CBE",
+      "closed_scheme": "NEW SWARNA SUBHIKSHAM",
+      "rejoined_ss": true,
+      "rejoined_sv": false
+    }
+  ],
+  "output_files": {
+    "enrollment_markdown": "data\\test_runs\\blind_test_20261025\\enrollment_report_20261025.md",
+    "enrollment_csv": "data\\test_runs\\blind_test_20261025\\enrollment_report_20261025.csv",
+    "closing_markdown": "data\\test_runs\\blind_test_20261025\\closing_rejoining_report_20261025.md",
+    "closing_csv": "data\\test_runs\\blind_test_20261025\\closing_rejoining_report_20261025.csv"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "test_name": "TEST 2 \u2014 MULTI-DAY CATCH-UP",
+  "from_date": "2026-10-23",
+  "to_date": "2026-10-24",
+  "timestamp_utc": "2026-10-27T06:22:37.325325+00:00",
+  "datasets": {
+    "subhiksham": {
+      "total_rows": 392,
+      "unique_msno_count": 392,
+      "zero_cross_day_duplicates": true,
+      "date_attribution_preserved": true,
+      "breakdown_by_normalized_date": {
+        "2026-10-24": 219,
+        "2026-10-23": 173
+      }
+    },
+    "viruksham": {
+      "total_rows": 108,
+      "unique_msno_count": 108,
+      "zero_cross_day_duplicates": true,
+      "date_attribution_preserved": true,
+      "breakdown_by_normalized_date": {
+        "2026-10-23": 38,
+        "2026-10-24": 70
+      }
+    },
+    "closing": {
+      "total_rows": 420,
+      "unique_docno_count": 311,
+      "date_attribution_preserved": true,
+      "breakdown_by_normalized_date": {
+        "2026-10-23": 169,
+        "2026-10-24": 251
+      }
+    }
+  },
+  "overall_status": "PASS"
+}

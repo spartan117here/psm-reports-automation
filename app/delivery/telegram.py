@@ -157,8 +157,14 @@ def resolve_telegram_screenshot(
     screenshot_path = base_dir / filename
     if not screenshot_path.is_file():
         mock_path = base_dir / f"mock_{filename}"
+        mock_sub_path = base_dir / "mock" / f"mock_{filename}"
+        mock_sub_clean = base_dir / "mock" / filename
         if mock_path.is_file():
             screenshot_path = mock_path
+        elif mock_sub_path.is_file():
+            screenshot_path = mock_sub_path
+        elif mock_sub_clean.is_file():
+            screenshot_path = mock_sub_clean
         else:
             raise FileNotFoundError(
                 f"Screenshot '{filename}' not found for date {report_date.isoformat()} at: {screenshot_path}"
@@ -169,30 +175,41 @@ def resolve_telegram_screenshot(
 
 def format_telegram_caption(
     report_date: date,
-    report_title: str = "Executive Report",
+    report_title: str = "New Enrollment Report",
     enrollment_total: Optional[int] = None,
     closing_total: Optional[int] = None,
     rejoining_rate_pct: Optional[float] = None,
     notes: Optional[str] = None,
 ) -> str:
-    """Format Telegram report photo caption (within 1024 char limit)."""
+    """
+    Format professional Telegram report photo caption.
+
+    Contains exactly two lines:
+    Line 1: POTHYS SWARNA MAHAL
+    Line 2: Daily <Report Title> — <DD/MM/YYYY>
+
+    Examples:
+        POTHYS SWARNA MAHAL
+        Daily New Enrollment Report — 26/10/2026
+
+        POTHYS SWARNA MAHAL
+        Daily Scheme Rejoining Report — 26/10/2026
+    """
     date_str = report_date.strftime("%d/%m/%Y")
-    lines = [
-        "📊 POTHYS SWARNA MAHAL",
-        f"Daily {report_title} — {date_str}",
-        "━" * 28,
-    ]
-    if enrollment_total is not None:
-        lines.append(f"• New Scheme Enrollments: {enrollment_total:,}")
-    if closing_total is not None:
-        lines.append(f"• Scheme Closures: {closing_total:,}")
-    if rejoining_rate_pct is not None:
-        lines.append(f"• Overall Rejoining Rate: {rejoining_rate_pct:.2f}%")
-    if notes:
-        lines.append(f"ℹ️ {notes}")
-    lines.append("━" * 28)
-    lines.append("🔒 Confidential — Internal Management Distribution")
-    return "\n".join(lines)[:1024]
+    clean_title = report_title.strip()
+    if clean_title.startswith("Daily "):
+        clean_title = clean_title[6:].strip()
+
+    title_lower = clean_title.lower()
+    if "rejoining" in title_lower or "closing" in title_lower:
+        canonical_title = "Scheme Rejoining Report"
+    elif "enrollment" in title_lower:
+        canonical_title = "New Enrollment Report"
+    else:
+        canonical_title = clean_title
+
+    return f"POTHYS SWARNA MAHAL\nDaily {canonical_title} — {date_str}"
+
 
 
 class TelegramDeliveryHistory:

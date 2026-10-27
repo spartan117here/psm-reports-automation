@@ -1,0 +1,54 @@
+{
+  "kanchi_status": {
+    "ss_count": 23,
+    "ss_amount": 171500.0,
+    "ss_resolved": true,
+    "sv_count": 5,
+    "sv_amount": 1611800.0,
+    "sv_resolved": true,
+    "status": "PASS"
+  },
+  "target_formula_investigation": {
+    "sum_8_targets": 313000000.0,
+    "kanchi_target": 27000000.0,
+    "total_targets_with_kanchi": 340000000.0,
+    "sheet_reported_total": 313000000.0,
+    "omits_row_14": true,
+    "conclusion": "Outdated formula range =SUM(F6:F13) in upstream Google Sheet cell F16. Does not reflect Kanchi Row 14 (\u20b927M)."
+  },
+  "nagercoil_investigation": {
+    "stock_unresolved_ss": 40,
+    "stock_unresolved_sv": 5,
+    "total_stock_unresolved": 45,
+    "stock_misattributed_ss": 6,
+    "stock_misattributed_sv": 3,
+    "fixed_unresolved_ss": 0,
+    "fixed_unresolved_sv": 0,
+    "fixed_attributed_ss": 46,
+    "fixed_attributed_sv": 8,
+    "status": "PASS"
+  },
+  "reconciliation": {
+    "raw_ss_count": 317,
+    "agg_ss_count": 317,
+    "count_match_ss": true,
+    "raw_ss_amount": 2839000.0,
+    "agg_ss_amount": 2839000.0,
+    "amount_match_ss": true,
+    "raw_sv_count": 72,
+    "agg_sv_count": 72,
+    "count_match_sv": true,
+    "raw_sv_amount": 21511494.0,
+    "agg_sv_amount": 21511494.0,
+    "amount_match_sv": true,
+    "status": "PASS"
+  },
+  "channel_separation": {
+    "online_ss_count": 18,
+    "online_ss_correct": true,
+    "online_sv_count": 8,
+    "online_sv_correct": true,
+    "physical_branches_count": 10,
+    "status": "PASS"
+  }
+}

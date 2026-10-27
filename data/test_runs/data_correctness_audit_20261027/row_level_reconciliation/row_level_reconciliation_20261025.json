@@ -1,0 +1,358 @@
+{
+  "test_name": "TEST 3 \u2014 DATA CLEANING AND BRANCH ATTRIBUTION",
+  "target_date": "2026-10-25",
+  "timestamp_utc": "2026-10-27T06:22:37.601408+00:00",
+  "datasets": {
+    "subhiksham": {
+      "source_rows": 317,
+      "accepted_rows": 277,
+      "unresolved_attribution_rows": 40,
+      "duplicate_msno_rows": 0,
+      "invalid_rows": 0,
+      "reconciled_total": 317,
+      "reconciliation_identity_holds": true,
+      "unresolved_records_detail": [
+        {
+          "msno": "NGL27SCT/31",
+          "costname": "NGL",
+          "commcode": "3591",
+          "recamount": 40000.0,
+          "resolved_location": "UNRESOLVED (3591)"
+        },
+        {
+          "msno": "NGL27SCT/2",
+          "costname": "NGL",
+          "commcode": "3505",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3505)"
+        },
+        {
+          "msno": "NGL27SCT/3",
+          "costname": "NGL",
+          "commcode": "3505",
+          "recamount": 1000.0,
+          "resolved_location": "UNRESOLVED (3505)"
+        },
+        {
+          "msno": "NGL27SCT/4",
+          "costname": "NGL",
+          "commcode": "3490",
+          "recamount": 1000.0,
+          "resolved_location": "UNRESOLVED (3490)"
+        },
+        {
+          "msno": "NGL27SCT/5",
+          "costname": "NGL",
+          "commcode": "3516",
+          "recamount": 1000.0,
+          "resolved_location": "UNRESOLVED (3516)"
+        },
+        {
+          "msno": "NGL27SCT/11",
+          "costname": "NGL",
+          "commcode": "3502",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3502)"
+        },
+        {
+          "msno": "NGL27SCT/12",
+          "costname": "NGL",
+          "commcode": "3575",
+          "recamount": 1500.0,
+          "resolved_location": "UNRESOLVED (3575)"
+        },
+        {
+          "msno": "NGL27SCT/13",
+          "costname": "NGL",
+          "commcode": "3515",
+          "recamount": 3000.0,
+          "resolved_location": "UNRESOLVED (3515)"
+        },
+        {
+          "msno": "NGL27SCT/15",
+          "costname": "NGL",
+          "commcode": "3552",
+          "recamount": 25000.0,
+          "resolved_location": "UNRESOLVED (3552)"
+        },
+        {
+          "msno": "NGL27SCT/16",
+          "costname": "NGL",
+          "commcode": "3557",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3557)"
+        },
+        {
+          "msno": "NGL27SCT/17",
+          "costname": "NGL",
+          "commcode": "3515",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3515)"
+        },
+        {
+          "msno": "NGL27SCT/18",
+          "costname": "NGL",
+          "commcode": "3504",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3504)"
+        },
+        {
+          "msno": "NGL27SCT/19",
+          "costname": "NGL",
+          "commcode": "3504",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3504)"
+        },
+        {
+          "msno": "NGL27SCT/21",
+          "costname": "NGL",
+          "commcode": "3499",
+          "recamount": 1000.0,
+          "resolved_location": "UNRESOLVED (3499)"
+        },
+        {
+          "msno": "NGL27SCT/22",
+          "costname": "NGL",
+          "commcode": "3566",
+          "recamount": 3000.0,
+          "resolved_location": "UNRESOLVED (3566)"
+        },
+        {
+          "msno": "NGL27SCT/23",
+          "costname": "NGL",
+          "commcode": "3502",
+          "recamount": 50000.0,
+          "resolved_location": "UNRESOLVED (3502)"
+        },
+        {
+          "msno": "NGL27SCT/24",
+          "costname": "NGL",
+          "commcode": "3504",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3504)"
+        },
+        {
+          "msno": "NGL27SCT/25",
+          "costname": "NGL",
+          "commcode": "3557",
+          "recamount": 20000.0,
+          "resolved_location": "UNRESOLVED (3557)"
+        },
+        {
+          "msno": "NGL27SCT/26",
+          "costname": "NGL",
+          "commcode": "3552",
+          "recamount": 15000.0,
+          "resolved_location": "UNRESOLVED (3552)"
+        },
+        {
+          "msno": "NGL27SCT/32",
+          "costname": "NGL",
+          "commcode": "3512",
+          "recamount": 1000.0,
+          "resolved_location": "UNRESOLVED (3512)"
+        },
+        {
+          "msno": "NGL27SCT/33",
+          "costname": "NGL",
+          "commcode": "3589",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3589)"
+        },
+        {
+          "msno": "NGL27SCT/37",
+          "costname": "NGL",
+          "commcode": "3604",
+          "recamount": 15500.0,
+          "resolved_location": "UNRESOLVED (3604)"
+        },
+        {
+          "msno": "NGL27SCT/38",
+          "costname": "NGL",
+          "commcode": "3515",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3515)"
+        },
+        {
+          "msno": "NGL27SCT/40",
+          "costname": "NGL",
+          "commcode": "3604",
+          "recamount": 1000.0,
+          "resolved_location": "UNRESOLVED (3604)"
+        },
+        {
+          "msno": "NGL27SCT/41",
+          "costname": "NGL",
+          "commcode": "3514",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3514)"
+        },
+        {
+          "msno": "NGL27SCT/43",
+          "costname": "NGL",
+          "commcode": "3509",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3509)"
+        },
+        {
+          "msno": "NGL27SCT/45",
+          "costname": "NGL",
+          "commcode": "3582",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3582)"
+        },
+        {
+          "msno": "NGL27SCT/46",
+          "costname": "NGL",
+          "commcode": "3509",
+          "recamount": 3000.0,
+          "resolved_location": "UNRESOLVED (3509)"
+        },
+        {
+          "msno": "NGL27SCT/47",
+          "costname": "NGL",
+          "commcode": "3509",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3509)"
+        },
+        {
+          "msno": "NGL27SCT/48",
+          "costname": "NGL",
+          "commcode": "3557",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3557)"
+        },
+        {
+          "msno": "NGL27SCT/49",
+          "costname": "NGL",
+          "commcode": "3575",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3575)"
+        },
+        {
+          "msno": "NGL27SCT/59",
+          "costname": "NGL",
+          "commcode": "3604",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3604)"
+        },
+        {
+          "msno": "NGL27SCT/60",
+          "costname": "NGL",
+          "commcode": "3557",
+          "recamount": 10000.0,
+          "resolved_location": "UNRESOLVED (3557)"
+        },
+        {
+          "msno": "NGL27SCT/62",
+          "costname": "NGL",
+          "commcode": "3578",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3578)"
+        },
+        {
+          "msno": "NGL27SCT/63",
+          "costname": "NGL",
+          "commcode": "3604",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3604)"
+        },
+        {
+          "msno": "NGL27SCT/66",
+          "costname": "NGL",
+          "commcode": "3507",
+          "recamount": 2000.0,
+          "resolved_location": "UNRESOLVED (3507)"
+        },
+        {
+          "msno": "NGL27SCT/69",
+          "costname": "NGL",
+          "commcode": "3613",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3613)"
+        },
+        {
+          "msno": "NGL27SCT/70",
+          "costname": "NGL",
+          "commcode": "3583",
+          "recamount": 10500.0,
+          "resolved_location": "UNRESOLVED (3583)"
+        },
+        {
+          "msno": "NGL27SCT/73",
+          "costname": "NGL",
+          "commcode": "3582",
+          "recamount": 5000.0,
+          "resolved_location": "UNRESOLVED (3582)"
+        },
+        {
+          "msno": "NGL27SCT/80",
+          "costname": "NGL",
+          "commcode": "3432",
+          "recamount": 10000.0,
+          "resolved_location": "UNRESOLVED (3432)"
+        }
+      ]
+    },
+    "viruksham": {
+      "source_rows": 72,
+      "accepted_rows": 67,
+      "unresolved_attribution_rows": 5,
+      "duplicate_msno_rows": 0,
+      "invalid_rows": 0,
+      "reconciled_total": 72,
+      "reconciliation_identity_holds": true,
+      "unresolved_records_detail": [
+        {
+          "msno": "NGL27SCT/6",
+          "costname": "NGL",
+          "commcode": "3504",
+          "recamount": 120000.0,
+          "resolved_location": "UNRESOLVED (3504)"
+        },
+        {
+          "msno": "NGL27SCT/36",
+          "costname": "NGL",
+          "commcode": "3586",
+          "recamount": 195000.0,
+          "resolved_location": "UNRESOLVED (3586)"
+        },
+        {
+          "msno": "NGL27SCT/39",
+          "costname": "NGL",
+          "commcode": "3410",
+          "recamount": 750000.0,
+          "resolved_location": "UNRESOLVED (3410)"
+        },
+        {
+          "msno": "NGL27SCT/54",
+          "costname": "NGL",
+          "commcode": "3501",
+          "recamount": 199000.0,
+          "resolved_location": "UNRESOLVED (3501)"
+        },
+        {
+          "msno": "NGL27SCT/81",
+          "costname": "NGL",
+          "commcode": "3604",
+          "recamount": 460012.0,
+          "resolved_location": "UNRESOLVED (3604)"
+        }
+      ]
+    },
+    "closing": {
+      "source_rows": 333,
+      "accepted_cleaned_rows": 333,
+      "excluded_digi_rows": 0,
+      "invalid_rows": 0,
+      "reconciled_total": 333,
+      "reconciliation_identity_holds": true
+    }
+  },
+  "findings": {
+    "ngl_unresolved_cause": "NGL showroom exists in mappings.yaml showroom_codes, but is absent from SHOWROOM_TO_BRANCH in app/processing/location.py and employee_mapping.json. 40 SS records (INR 287,500.00) and 5 SV records (INR 1,724,012.00) under COSTNAME: NGL were safely captured and tagged as NGL / Unresolved under FLAG_AND_CONTINUE policy.",
+    "msno_duplicates": "0 duplicate MSNOs found in 25-10-2026 batch for SS or SV.",
+    "digi_exclusions": "0 DigiGold/DigiSilver records in closing batch (0 found as Innervex query uncheck rule excluded them at source)."
+  },
+  "overall_status": "PASS"
+}
