@@ -1,0 +1,351 @@
+{
+  "report_date": "2026-10-28",
+  "execution_time": "2026-10-29T12:11:30.571623",
+  "strict_read_only": true,
+  "production_changes_made": false,
+  "gate_status": "PASS WITH WARNINGS",
+  "is_safe_for_delivery": true,
+  "revenue_totals": {
+    "target": 313000000.0,
+    "subhiksham": 38904500.0,
+    "viruksham": 345315879.0,
+    "total": 384220379.0,
+    "yet_to_achieve": 71220379.0,
+    "achieved_pct": 123
+  },
+  "count_totals": {
+    "target": 36000,
+    "subhiksham": 5371,
+    "viruksham": 1085,
+    "digi_gold": 21168,
+    "digi_silver": 5031,
+    "total_count": 32655,
+    "avg_per_day": 1166
+  },
+  "rejoining_totals": {
+    "closed_count": 4895,
+    "rejoin_ss": 942,
+    "rejoin_sv": 92,
+    "total_rejoin": 1034,
+    "rejoin_percentage": 21.12,
+    "closed_weight_g": 35075.519,
+    "closed_ss_count": 4184,
+    "closed_sv_count": 711
+  },
+  "table1_revenue_rows": [
+    {
+      "branch": "TVL",
+      "target_value": 40000000.0,
+      "subhiksham": 4105500.0,
+      "viruksham": 49300281.0,
+      "total": 53405781.0,
+      "yet_to_achieve": 13405781.0,
+      "achieved_pct": 134
+    },
+    {
+      "branch": "CPT",
+      "target_value": 72000000.0,
+      "subhiksham": 10205500.0,
+      "viruksham": 82036981.0,
+      "total": 92242481.0,
+      "yet_to_achieve": 20242481.0,
+      "achieved_pct": 128
+    },
+    {
+      "branch": "TVM",
+      "target_value": 27000000.0,
+      "subhiksham": 2161500.0,
+      "viruksham": 22449742.0,
+      "total": 24611242.0,
+      "yet_to_achieve": -2388758.0,
+      "achieved_pct": 91
+    },
+    {
+      "branch": "TPJ",
+      "target_value": 40000000.0,
+      "subhiksham": 2827500.0,
+      "viruksham": 38525356.0,
+      "total": 41352856.0,
+      "yet_to_achieve": 1352856.0,
+      "achieved_pct": 103
+    },
+    {
+      "branch": "CBE",
+      "target_value": 30000000.0,
+      "subhiksham": 2334500.0,
+      "viruksham": 23032929.0,
+      "total": 25367429.0,
+      "yet_to_achieve": -4632571.0,
+      "achieved_pct": 85
+    },
+    {
+      "branch": "SLM",
+      "target_value": 30000000.0,
+      "subhiksham": 1470000.0,
+      "viruksham": 30106441.0,
+      "total": 31576441.0,
+      "yet_to_achieve": 1576441.0,
+      "achieved_pct": 105
+    },
+    {
+      "branch": "PNM",
+      "target_value": 20000000.0,
+      "subhiksham": 2514000.0,
+      "viruksham": 15649225.0,
+      "total": 18163225.0,
+      "yet_to_achieve": -1836775.0,
+      "achieved_pct": 91
+    },
+    {
+      "branch": "PADI",
+      "target_value": 54000000.0,
+      "subhiksham": 7302500.0,
+      "viruksham": 57501201.0,
+      "total": 64803701.0,
+      "yet_to_achieve": 10803701.0,
+      "achieved_pct": 120
+    },
+    {
+      "branch": "KANCHI",
+      "target_value": 27000000.0,
+      "subhiksham": 2854000.0,
+      "viruksham": 13099106.0,
+      "total": 15953106.0,
+      "yet_to_achieve": -11046894.0,
+      "achieved_pct": 59
+    },
+    {
+      "branch": "NGL",
+      "target_value": null,
+      "subhiksham": 598500.0,
+      "viruksham": 4486533.0,
+      "total": 5085033.0,
+      "yet_to_achieve": 5085033.0,
+      "achieved_pct": null
+    },
+    {
+      "branch": "ONLINE",
+      "target_value": null,
+      "subhiksham": 2531000.0,
+      "viruksham": 9128084.0,
+      "total": 11659084.0,
+      "yet_to_achieve": 11659084.0,
+      "achieved_pct": null
+    }
+  ],
+  "table2_count_rows": [
+    {
+      "branch": "TVL",
+      "count_target": 3000,
+      "subhiksham": 597,
+      "viruksham": 133,
+      "digi_gold": 881,
+      "digi_silver": 415,
+      "total_count": 2026,
+      "avg": 72
+    },
+    {
+      "branch": "CPT",
+      "count_target": 6000,
+      "subhiksham": 1024,
+      "viruksham": 264,
+      "digi_gold": 2256,
+      "digi_silver": 454,
+      "total_count": 3998,
+      "avg": 143
+    },
+    {
+      "branch": "TVM",
+      "count_target": 4000,
+      "subhiksham": 308,
+      "viruksham": 42,
+      "digi_gold": 1992,
+      "digi_silver": 51,
+      "total_count": 2393,
+      "avg": 85
+    },
+    {
+      "branch": "TPJ",
+      "count_target": 5000,
+      "subhiksham": 579,
+      "viruksham": 95,
+      "digi_gold": 2044,
+      "digi_silver": 723,
+      "total_count": 3441,
+      "avg": 123
+    },
+    {
+      "branch": "CBE",
+      "count_target": 7000,
+      "subhiksham": 454,
+      "viruksham": 79,
+      "digi_gold": 2228,
+      "digi_silver": 983,
+      "total_count": 3744,
+      "avg": 134
+    },
+    {
+      "branch": "SLM",
+      "count_target": 3000,
+      "subhiksham": 281,
+      "viruksham": 92,
+      "digi_gold": 1467,
+      "digi_silver": 509,
+      "total_count": 2349,
+      "avg": 84
+    },
+    {
+      "branch": "PNM",
+      "count_target": 2000,
+      "subhiksham": 270,
+      "viruksham": 51,
+      "digi_gold": 483,
+      "digi_silver": 162,
+      "total_count": 966,
+      "avg": 34
+    },
+    {
+      "branch": "PADI",
+      "count_target": 6000,
+      "subhiksham": 858,
+      "viruksham": 190,
+      "digi_gold": 1600,
+      "digi_silver": 372,
+      "total_count": 3020,
+      "avg": 108
+    },
+    {
+      "branch": "KANCHI",
+      "count_target": null,
+      "subhiksham": 509,
+      "viruksham": 48,
+      "digi_gold": 2519,
+      "digi_silver": 301,
+      "total_count": 3377,
+      "avg": 121
+    },
+    {
+      "branch": "NGL",
+      "count_target": null,
+      "subhiksham": 92,
+      "viruksham": 11,
+      "digi_gold": 254,
+      "digi_silver": 6,
+      "total_count": 363,
+      "avg": 13
+    },
+    {
+      "branch": "E COMM",
+      "count_target": null,
+      "subhiksham": 399,
+      "viruksham": 80,
+      "digi_gold": 5444,
+      "digi_silver": 1055,
+      "total_count": 6978,
+      "avg": 249
+    }
+  ],
+  "rejoining_table_rows": [
+    {
+      "showroom": "TVL",
+      "closed_count": 598,
+      "rejoin_ss": 136,
+      "rejoin_sv": 18,
+      "total_rejoin": 154,
+      "rejoin_percentage": 25.75
+    },
+    {
+      "showroom": "CPT",
+      "closed_count": 1183,
+      "rejoin_ss": 232,
+      "rejoin_sv": 24,
+      "total_rejoin": 256,
+      "rejoin_percentage": 21.64
+    },
+    {
+      "showroom": "TVM",
+      "closed_count": 566,
+      "rejoin_ss": 125,
+      "rejoin_sv": 12,
+      "total_rejoin": 137,
+      "rejoin_percentage": 24.2
+    },
+    {
+      "showroom": "TPJ",
+      "closed_count": 894,
+      "rejoin_ss": 178,
+      "rejoin_sv": 9,
+      "total_rejoin": 187,
+      "rejoin_percentage": 20.92
+    },
+    {
+      "showroom": "CBE",
+      "closed_count": 750,
+      "rejoin_ss": 147,
+      "rejoin_sv": 9,
+      "total_rejoin": 156,
+      "rejoin_percentage": 20.8
+    },
+    {
+      "showroom": "SLM",
+      "closed_count": 366,
+      "rejoin_ss": 54,
+      "rejoin_sv": 7,
+      "total_rejoin": 61,
+      "rejoin_percentage": 16.67
+    },
+    {
+      "showroom": "PNM",
+      "closed_count": 342,
+      "rejoin_ss": 46,
+      "rejoin_sv": 7,
+      "total_rejoin": 53,
+      "rejoin_percentage": 15.5
+    },
+    {
+      "showroom": "PADI",
+      "closed_count": 195,
+      "rejoin_ss": 24,
+      "rejoin_sv": 6,
+      "total_rejoin": 30,
+      "rejoin_percentage": 15.38
+    },
+    {
+      "showroom": "KPM",
+      "closed_count": 1,
+      "rejoin_ss": 0,
+      "rejoin_sv": 0,
+      "total_rejoin": 0,
+      "rejoin_percentage": 0.0
+    }
+  ],
+  "gate_summary": {
+    "passed_checks": [
+      "1.required_source_files_and_worksheets",
+      "2.report_date_cutoff_isolation",
+      "3.expected_showrooms_present",
+      "4.duplicate_and_dropped_records",
+      "5.unresolved_mappings",
+      "6.source_totals_reconciliation",
+      "7.branch_subtotals_reconciliation_revenue_achieved",
+      "7.branch_subtotals_reconciliation_total_achieved_count",
+      "8.rejoining_math_reconciliation",
+      "9.closing_cross_table_reconciliation",
+      "10.required_report_tables_populated",
+      "11.missing_targets_handling",
+      "12.historical_reproducibility",
+      "13.digigold_digisilver_readiness_and_deadline"
+    ],
+    "warnings": [
+      {
+        "check_name": "14.unconfigured_targets_audit_warning",
+        "message": "Active showrooms operate without configured count targets in production spreadsheet"
+      },
+      {
+        "check_name": "15.closing_records_date_coverage",
+        "message": "Store closing team has not uploaded 28-October closures to Google Sheets yet; historical cutoff strictly applied to available records"
+      }
+    ],
+    "critical_failures": []
+  }
+}

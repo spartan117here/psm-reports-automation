@@ -1,0 +1,890 @@
+{
+  "computed_26": {
+    "revenue": [
+      {
+        "branch": "TVL",
+        "target": 40000000.0,
+        "subhiksham": 3843500.0,
+        "viruksham": 44485047.0,
+        "total": 48328547.0,
+        "yet_to_achieve": 8328547.0,
+        "achieved_pct": 121
+      },
+      {
+        "branch": "CPT",
+        "target": 72000000.0,
+        "subhiksham": 9663500.0,
+        "viruksham": 76668995.0,
+        "total": 86332495.0,
+        "yet_to_achieve": 14332495.0,
+        "achieved_pct": 120
+      },
+      {
+        "branch": "TVM",
+        "target": 27000000.0,
+        "subhiksham": 2082500.0,
+        "viruksham": 22449742.0,
+        "total": 24532242.0,
+        "yet_to_achieve": -2467758.0,
+        "achieved_pct": 91
+      },
+      {
+        "branch": "TPJ",
+        "target": 40000000.0,
+        "subhiksham": 2719000.0,
+        "viruksham": 34892821.0,
+        "total": 37611821.0,
+        "yet_to_achieve": -2388179.0,
+        "achieved_pct": 94
+      },
+      {
+        "branch": "CBE",
+        "target": 30000000.0,
+        "subhiksham": 2204000.0,
+        "viruksham": 22366809.0,
+        "total": 24570809.0,
+        "yet_to_achieve": -5429191.0,
+        "achieved_pct": 82
+      },
+      {
+        "branch": "SLM",
+        "target": 30000000.0,
+        "subhiksham": 1437500.0,
+        "viruksham": 28840681.0,
+        "total": 30278181.0,
+        "yet_to_achieve": 278181.0,
+        "achieved_pct": 101
+      },
+      {
+        "branch": "PNM",
+        "target": 20000000.0,
+        "subhiksham": 2423500.0,
+        "viruksham": 14157021.0,
+        "total": 16580521.0,
+        "yet_to_achieve": -3419479.0,
+        "achieved_pct": 83
+      },
+      {
+        "branch": "PADI",
+        "target": 54000000.0,
+        "subhiksham": 6946000.0,
+        "viruksham": 53272381.0,
+        "total": 60218381.0,
+        "yet_to_achieve": 6218381.0,
+        "achieved_pct": 112
+      },
+      {
+        "branch": "KANCHI",
+        "target": 27000000.0,
+        "subhiksham": 2805000.0,
+        "viruksham": 11056518.0,
+        "total": 13861518.0,
+        "yet_to_achieve": -13138482.0,
+        "achieved_pct": 51
+      },
+      {
+        "branch": "NGL",
+        "target": null,
+        "subhiksham": 387000.0,
+        "viruksham": 2375412.0,
+        "total": 2762412.0,
+        "yet_to_achieve": 2762412.0,
+        "achieved_pct": null
+      },
+      {
+        "branch": "ONLINE",
+        "target": null,
+        "subhiksham": 2361000.0,
+        "viruksham": 7316684.0,
+        "total": 9677684.0,
+        "yet_to_achieve": 9677684.0,
+        "achieved_pct": null
+      },
+      {
+        "branch": "Total",
+        "target": 313000000.0,
+        "subhiksham": 36872500.0,
+        "viruksham": 317882111.0,
+        "total": 354754611.0,
+        "yet_to_achieve": 41754611.0,
+        "achieved_pct": 113
+      }
+    ],
+    "count": [
+      {
+        "branch": "TVL",
+        "target": 3000,
+        "subhiksham": 559,
+        "viruksham": 119,
+        "digi_gold": 821,
+        "digi_silver": 394,
+        "total": 1893,
+        "avg": 73
+      },
+      {
+        "branch": "CPT",
+        "target": 6000,
+        "subhiksham": 973,
+        "viruksham": 241,
+        "digi_gold": 2232,
+        "digi_silver": 427,
+        "total": 3873,
+        "avg": 149
+      },
+      {
+        "branch": "TVM",
+        "target": 4000,
+        "subhiksham": 287,
+        "viruksham": 42,
+        "digi_gold": 1910,
+        "digi_silver": 47,
+        "total": 2286,
+        "avg": 88
+      },
+      {
+        "branch": "TPJ",
+        "target": 5000,
+        "subhiksham": 551,
+        "viruksham": 90,
+        "digi_gold": 1922,
+        "digi_silver": 674,
+        "total": 3237,
+        "avg": 124
+      },
+      {
+        "branch": "CBE",
+        "target": 7000,
+        "subhiksham": 425,
+        "viruksham": 75,
+        "digi_gold": 2124,
+        "digi_silver": 953,
+        "total": 3577,
+        "avg": 138
+      },
+      {
+        "branch": "SLM",
+        "target": 3000,
+        "subhiksham": 268,
+        "viruksham": 89,
+        "digi_gold": 1351,
+        "digi_silver": 482,
+        "total": 2190,
+        "avg": 84
+      },
+      {
+        "branch": "PNM",
+        "target": 2000,
+        "subhiksham": 256,
+        "viruksham": 43,
+        "digi_gold": 464,
+        "digi_silver": 155,
+        "total": 918,
+        "avg": 35
+      },
+      {
+        "branch": "PADI",
+        "target": 6000,
+        "subhiksham": 805,
+        "viruksham": 175,
+        "digi_gold": 1543,
+        "digi_silver": 365,
+        "total": 2888,
+        "avg": 111
+      },
+      {
+        "branch": "KANCHI",
+        "target": null,
+        "subhiksham": 496,
+        "viruksham": 44,
+        "digi_gold": 2424,
+        "digi_silver": 289,
+        "total": 3253,
+        "avg": 125
+      },
+      {
+        "branch": "NGL",
+        "target": null,
+        "subhiksham": 58,
+        "viruksham": 8,
+        "digi_gold": 143,
+        "digi_silver": 3,
+        "total": 212,
+        "avg": 8
+      },
+      {
+        "branch": "E COMM",
+        "target": null,
+        "subhiksham": 375,
+        "viruksham": 64,
+        "digi_gold": 5558,
+        "digi_silver": 990,
+        "total": 6987,
+        "avg": 269
+      },
+      {
+        "branch": "Total",
+        "target": 36000,
+        "subhiksham": 5053,
+        "viruksham": 990,
+        "digi_gold": 20492,
+        "digi_silver": 4779,
+        "total": 31314,
+        "avg": 1204
+      }
+    ]
+  },
+  "computed_27": {
+    "revenue": [
+      {
+        "branch": "TVL",
+        "target": 40000000.0,
+        "subhiksham": 4034000.0,
+        "viruksham": 46574744.0,
+        "total": 50608744.0,
+        "yet_to_achieve": 10608744.0,
+        "achieved_pct": 127
+      },
+      {
+        "branch": "CPT",
+        "target": 72000000.0,
+        "subhiksham": 9999000.0,
+        "viruksham": 79815518.0,
+        "total": 89814518.0,
+        "yet_to_achieve": 17814518.0,
+        "achieved_pct": 125
+      },
+      {
+        "branch": "TVM",
+        "target": 27000000.0,
+        "subhiksham": 2117500.0,
+        "viruksham": 22449742.0,
+        "total": 24567242.0,
+        "yet_to_achieve": -2432758.0,
+        "achieved_pct": 91
+      },
+      {
+        "branch": "TPJ",
+        "target": 40000000.0,
+        "subhiksham": 2758500.0,
+        "viruksham": 38392966.0,
+        "total": 41151466.0,
+        "yet_to_achieve": 1151466.0,
+        "achieved_pct": 103
+      },
+      {
+        "branch": "CBE",
+        "target": 30000000.0,
+        "subhiksham": 2268500.0,
+        "viruksham": 22421809.0,
+        "total": 24690309.0,
+        "yet_to_achieve": -5309691.0,
+        "achieved_pct": 82
+      },
+      {
+        "branch": "SLM",
+        "target": 30000000.0,
+        "subhiksham": 1462500.0,
+        "viruksham": 29050841.0,
+        "total": 30513341.0,
+        "yet_to_achieve": 513341.0,
+        "achieved_pct": 102
+      },
+      {
+        "branch": "PNM",
+        "target": 20000000.0,
+        "subhiksham": 2483500.0,
+        "viruksham": 15167715.0,
+        "total": 17651215.0,
+        "yet_to_achieve": -2348785.0,
+        "achieved_pct": 88
+      },
+      {
+        "branch": "PADI",
+        "target": 54000000.0,
+        "subhiksham": 7102500.0,
+        "viruksham": 55229336.0,
+        "total": 62331836.0,
+        "yet_to_achieve": 8331836.0,
+        "achieved_pct": 115
+      },
+      {
+        "branch": "KANCHI",
+        "target": 27000000.0,
+        "subhiksham": 2828000.0,
+        "viruksham": 12360318.0,
+        "total": 15188318.0,
+        "yet_to_achieve": -11811682.0,
+        "achieved_pct": 56
+      },
+      {
+        "branch": "NGL",
+        "target": null,
+        "subhiksham": 487000.0,
+        "viruksham": 3275413.0,
+        "total": 3762413.0,
+        "yet_to_achieve": 3762413.0,
+        "achieved_pct": null
+      },
+      {
+        "branch": "ONLINE",
+        "target": null,
+        "subhiksham": 2478500.0,
+        "viruksham": 8510424.0,
+        "total": 10988924.0,
+        "yet_to_achieve": 10988924.0,
+        "achieved_pct": null
+      },
+      {
+        "branch": "Total",
+        "target": 313000000.0,
+        "subhiksham": 38019500.0,
+        "viruksham": 333248826.0,
+        "total": 371268326.0,
+        "yet_to_achieve": 58268326.0,
+        "achieved_pct": 119
+      }
+    ],
+    "count": [
+      {
+        "branch": "TVL",
+        "target": 3000,
+        "subhiksham": 577,
+        "viruksham": 127,
+        "digi_gold": 856,
+        "digi_silver": 408,
+        "total": 1968,
+        "avg": 73
+      },
+      {
+        "branch": "CPT",
+        "target": 6000,
+        "subhiksham": 1006,
+        "viruksham": 253,
+        "digi_gold": 2290,
+        "digi_silver": 435,
+        "total": 3984,
+        "avg": 148
+      },
+      {
+        "branch": "TVM",
+        "target": 4000,
+        "subhiksham": 296,
+        "viruksham": 42,
+        "digi_gold": 1956,
+        "digi_silver": 48,
+        "total": 2342,
+        "avg": 87
+      },
+      {
+        "branch": "TPJ",
+        "target": 5000,
+        "subhiksham": 567,
+        "viruksham": 93,
+        "digi_gold": 1991,
+        "digi_silver": 699,
+        "total": 3350,
+        "avg": 124
+      },
+      {
+        "branch": "CBE",
+        "target": 7000,
+        "subhiksham": 438,
+        "viruksham": 76,
+        "digi_gold": 2172,
+        "digi_silver": 965,
+        "total": 3651,
+        "avg": 135
+      },
+      {
+        "branch": "SLM",
+        "target": 3000,
+        "subhiksham": 278,
+        "viruksham": 90,
+        "digi_gold": 1391,
+        "digi_silver": 488,
+        "total": 2247,
+        "avg": 83
+      },
+      {
+        "branch": "PNM",
+        "target": 2000,
+        "subhiksham": 266,
+        "viruksham": 46,
+        "digi_gold": 477,
+        "digi_silver": 160,
+        "total": 949,
+        "avg": 35
+      },
+      {
+        "branch": "PADI",
+        "target": 6000,
+        "subhiksham": 830,
+        "viruksham": 183,
+        "digi_gold": 1575,
+        "digi_silver": 373,
+        "total": 2961,
+        "avg": 110
+      },
+      {
+        "branch": "KANCHI",
+        "target": null,
+        "subhiksham": 502,
+        "viruksham": 46,
+        "digi_gold": 2471,
+        "digi_silver": 296,
+        "total": 3315,
+        "avg": 123
+      },
+      {
+        "branch": "NGL",
+        "target": null,
+        "subhiksham": 68,
+        "viruksham": 9,
+        "digi_gold": 190,
+        "digi_silver": 6,
+        "total": 273,
+        "avg": 10
+      },
+      {
+        "branch": "E COMM",
+        "target": null,
+        "subhiksham": 387,
+        "viruksham": 72,
+        "digi_gold": 5748,
+        "digi_silver": 1034,
+        "total": 7241,
+        "avg": 268
+      },
+      {
+        "branch": "Total",
+        "target": 36000,
+        "subhiksham": 5215,
+        "viruksham": 1037,
+        "digi_gold": 21117,
+        "digi_silver": 4912,
+        "total": 32281,
+        "avg": 1196
+      }
+    ]
+  },
+  "ref_26": {
+    "revenue": {
+      "TVL": {
+        "target": 40000000.0,
+        "ss": 3843500.0,
+        "sv": 44485047.0,
+        "total": 48328547.0,
+        "yet": 8328547.0,
+        "ach_pct": 121
+      },
+      "CPT": {
+        "target": 72000000.0,
+        "ss": 9663500.0,
+        "sv": 76668995.0,
+        "total": 86332495.0,
+        "yet": 14332495.0,
+        "ach_pct": 120
+      },
+      "TVM": {
+        "target": 27000000.0,
+        "ss": 2082500.0,
+        "sv": 22449742.0,
+        "total": 24532242.0,
+        "yet": -2467758.0,
+        "ach_pct": 91
+      },
+      "TPJ": {
+        "target": 40000000.0,
+        "ss": 2719000.0,
+        "sv": 34892821.0,
+        "total": 37611821.0,
+        "yet": -2388179.0,
+        "ach_pct": 94
+      },
+      "CBE": {
+        "target": 30000000.0,
+        "ss": 2204000.0,
+        "sv": 22366809.0,
+        "total": 24570809.0,
+        "yet": -5429191.0,
+        "ach_pct": 82
+      },
+      "SLM": {
+        "target": 30000000.0,
+        "ss": 1437500.0,
+        "sv": 28840681.0,
+        "total": 30278181.0,
+        "yet": 278181.0,
+        "ach_pct": 101
+      },
+      "PNM": {
+        "target": 20000000.0,
+        "ss": 2423500.0,
+        "sv": 14157021.0,
+        "total": 16580521.0,
+        "yet": -3419479.0,
+        "ach_pct": 83
+      },
+      "PADI": {
+        "target": 54000000.0,
+        "ss": 6946000.0,
+        "sv": 53272381.0,
+        "total": 60218381.0,
+        "yet": 6218381.0,
+        "ach_pct": 112
+      },
+      "KANCHI": {
+        "target": 27000000.0,
+        "ss": 2805000.0,
+        "sv": 11056518.0,
+        "total": 13861518.0,
+        "yet": -13138482.0,
+        "ach_pct": 51
+      },
+      "NGL": {
+        "target": null,
+        "ss": 387000.0,
+        "sv": 2375412.0,
+        "total": 2762412.0,
+        "yet": 2762412.0,
+        "ach_pct": null
+      },
+      "ONLINE": {
+        "target": null,
+        "ss": 2361000.0,
+        "sv": 7316684.0,
+        "total": 9677684.0,
+        "yet": 9677684.0,
+        "ach_pct": null
+      },
+      "Total": {
+        "target": 313000000.0,
+        "ss": 36872500.0,
+        "sv": 317882111.0,
+        "total": 354754611.0,
+        "yet": 14754611.0,
+        "ach_pct": 113
+      }
+    },
+    "count": {
+      "TVL": {
+        "target": 3000,
+        "ss": 559,
+        "sv": 119,
+        "dg": 824,
+        "ds": 385,
+        "total": 1887,
+        "avg": 73
+      },
+      "CPT": {
+        "target": 6000,
+        "ss": 973,
+        "sv": 241,
+        "dg": 1985,
+        "ds": 373,
+        "total": 3572,
+        "avg": 137
+      },
+      "TVM": {
+        "target": 4000,
+        "ss": 287,
+        "sv": 42,
+        "dg": 1863,
+        "ds": 46,
+        "total": 2238,
+        "avg": 86
+      },
+      "TPJ": {
+        "target": 5000,
+        "ss": 551,
+        "sv": 90,
+        "dg": 1876,
+        "ds": 685,
+        "total": 3202,
+        "avg": 123
+      },
+      "CBE": {
+        "target": 7000,
+        "ss": 425,
+        "sv": 75,
+        "dg": 2070,
+        "ds": 961,
+        "total": 3531,
+        "avg": 136
+      },
+      "SLM": {
+        "target": 3000,
+        "ss": 268,
+        "sv": 89,
+        "dg": 1280,
+        "ds": 452,
+        "total": 2089,
+        "avg": 80
+      },
+      "PNM": {
+        "target": 2000,
+        "ss": 256,
+        "sv": 43,
+        "dg": 464,
+        "ds": 155,
+        "total": 918,
+        "avg": 35
+      },
+      "PADI": {
+        "target": 6000,
+        "ss": 805,
+        "sv": 175,
+        "dg": 1506,
+        "ds": 357,
+        "total": 2843,
+        "avg": 109
+      },
+      "KANCHI": {
+        "target": null,
+        "ss": 496,
+        "sv": 44,
+        "dg": 2746,
+        "ds": 378,
+        "total": 3664,
+        "avg": 141
+      },
+      "NGL": {
+        "target": null,
+        "ss": 58,
+        "sv": 8,
+        "dg": 143,
+        "ds": 3,
+        "total": 212,
+        "avg": 8
+      },
+      "E COMM": {
+        "target": null,
+        "ss": 375,
+        "sv": 64,
+        "dg": 5179,
+        "ds": 963,
+        "total": 6581,
+        "avg": 253
+      },
+      "Total": {
+        "target": 36000,
+        "ss": 5053,
+        "sv": 990,
+        "dg": 19936,
+        "ds": 4758,
+        "total": 30737,
+        "avg": 1182
+      }
+    }
+  },
+  "ref_27": {
+    "revenue": {
+      "TVL": {
+        "target": 40000000.0,
+        "ss": 4034000.0,
+        "sv": 46574744.0,
+        "total": 50608744.0,
+        "yet": 10608744.0,
+        "ach_pct": 127
+      },
+      "CPT": {
+        "target": 72000000.0,
+        "ss": 9999000.0,
+        "sv": 79815518.0,
+        "total": 89814518.0,
+        "yet": 17814518.0,
+        "ach_pct": 125
+      },
+      "TVM": {
+        "target": 27000000.0,
+        "ss": 2117500.0,
+        "sv": 22449742.0,
+        "total": 24567242.0,
+        "yet": -2432758.0,
+        "ach_pct": 91
+      },
+      "TPJ": {
+        "target": 40000000.0,
+        "ss": 2758500.0,
+        "sv": 38392966.0,
+        "total": 41151466.0,
+        "yet": 1151466.0,
+        "ach_pct": 103
+      },
+      "CBE": {
+        "target": 30000000.0,
+        "ss": 2268500.0,
+        "sv": 22421809.0,
+        "total": 24690309.0,
+        "yet": -5309691.0,
+        "ach_pct": 82
+      },
+      "SLM": {
+        "target": 30000000.0,
+        "ss": 1462500.0,
+        "sv": 29050841.0,
+        "total": 30513341.0,
+        "yet": 513341.0,
+        "ach_pct": 102
+      },
+      "PNM": {
+        "target": 20000000.0,
+        "ss": 2483500.0,
+        "sv": 15167715.0,
+        "total": 17651215.0,
+        "yet": -2348785.0,
+        "ach_pct": 88
+      },
+      "PADI": {
+        "target": 54000000.0,
+        "ss": 7102500.0,
+        "sv": 55229336.0,
+        "total": 62331836.0,
+        "yet": 8331836.0,
+        "ach_pct": 115
+      },
+      "KANCHI": {
+        "target": 27000000.0,
+        "ss": 2828000.0,
+        "sv": 12360318.0,
+        "total": 15188318.0,
+        "yet": -11811682.0,
+        "ach_pct": 56
+      },
+      "NGL": {
+        "target": null,
+        "ss": 487000.0,
+        "sv": 3275413.0,
+        "total": 3762413.0,
+        "yet": 3762413.0,
+        "ach_pct": null
+      },
+      "ONLINE": {
+        "target": null,
+        "ss": 2478500.0,
+        "sv": 8510424.0,
+        "total": 10988924.0,
+        "yet": 10988924.0,
+        "ach_pct": null
+      },
+      "Total": {
+        "target": 313000000.0,
+        "ss": 38019500.0,
+        "sv": 333248826.0,
+        "total": 371268326.0,
+        "yet": 31268326.0,
+        "ach_pct": 119
+      }
+    },
+    "count": {
+      "TVL": {
+        "target": 3000,
+        "ss": 577,
+        "sv": 127,
+        "dg": 856,
+        "ds": 408,
+        "total": 1968,
+        "avg": 73
+      },
+      "CPT": {
+        "target": 6000,
+        "ss": 1006,
+        "sv": 253,
+        "dg": 2201,
+        "ds": 435,
+        "total": 3895,
+        "avg": 144
+      },
+      "TVM": {
+        "target": 4000,
+        "ss": 296,
+        "sv": 42,
+        "dg": 1956,
+        "ds": 48,
+        "total": 2342,
+        "avg": 87
+      },
+      "TPJ": {
+        "target": 5000,
+        "ss": 567,
+        "sv": 93,
+        "dg": 1989,
+        "ds": 699,
+        "total": 3348,
+        "avg": 124
+      },
+      "CBE": {
+        "target": 7000,
+        "ss": 438,
+        "sv": 76,
+        "dg": 2172,
+        "ds": 965,
+        "total": 3651,
+        "avg": 135
+      },
+      "SLM": {
+        "target": 3000,
+        "ss": 278,
+        "sv": 90,
+        "dg": 1391,
+        "ds": 488,
+        "total": 2247,
+        "avg": 83
+      },
+      "PNM": {
+        "target": 2000,
+        "ss": 266,
+        "sv": 46,
+        "dg": 477,
+        "ds": 160,
+        "total": 949,
+        "avg": 35
+      },
+      "PADI": {
+        "target": 6000,
+        "ss": 830,
+        "sv": 183,
+        "dg": 1560,
+        "ds": 366,
+        "total": 2939,
+        "avg": 109
+      },
+      "KANCHI": {
+        "target": null,
+        "ss": 502,
+        "sv": 46,
+        "dg": 2471,
+        "ds": 296,
+        "total": 3315,
+        "avg": 123
+      },
+      "NGL": {
+        "target": null,
+        "ss": 68,
+        "sv": 9,
+        "dg": 190,
+        "ds": 6,
+        "total": 273,
+        "avg": 10
+      },
+      "E COMM": {
+        "target": null,
+        "ss": 387,
+        "sv": 72,
+        "dg": 5283,
+        "ds": 1017,
+        "total": 6759,
+        "avg": 250
+      },
+      "Total": {
+        "target": 36000,
+        "ss": 5215,
+        "sv": 1037,
+        "dg": 20546,
+        "ds": 4888,
+        "total": 31686,
+        "avg": 1174
+      }
+    }
+  }
+}

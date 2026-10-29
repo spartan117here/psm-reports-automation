@@ -1,0 +1,343 @@
+{
+  "report_date": "2026-10-27",
+  "cutoff_applied": "2026-10-27",
+  "execution_time": "2026-10-29T10:39:07.652890",
+  "strict_read_only": true,
+  "production_changes_made": false,
+  "gate_status": "PASS",
+  "is_safe_for_delivery": true,
+  "revenue_totals": {
+    "target": 340000000.0,
+    "subhiksham": 38019500.0,
+    "viruksham": 333248826.0,
+    "total": 371268326.0,
+    "yet_to_achieve": 31268326.0,
+    "achieved_pct": 109
+  },
+  "count_totals": {
+    "target": 36000,
+    "subhiksham": 5215,
+    "viruksham": 1037,
+    "digi_gold": 20546,
+    "digi_silver": 4888,
+    "total_count": 31686,
+    "avg_per_day": 1174
+  },
+  "rejoining_totals": {
+    "closed_count": 4895,
+    "rejoin_ss": 940,
+    "rejoin_sv": 92,
+    "total_rejoin": 1032,
+    "rejoin_percentage": 21.08,
+    "closed_weight_g": 35075.519,
+    "closed_ss_count": 4184,
+    "closed_sv_count": 711
+  },
+  "table1_revenue_rows": [
+    {
+      "branch": "TVL",
+      "target_value": 40000000.0,
+      "subhiksham": 4034000.0,
+      "viruksham": 46574744.0,
+      "total": 50608744.0,
+      "yet_to_achieve": 10608744.0,
+      "achieved_pct": 127
+    },
+    {
+      "branch": "CPT",
+      "target_value": 72000000.0,
+      "subhiksham": 9999000.0,
+      "viruksham": 79815518.0,
+      "total": 89814518.0,
+      "yet_to_achieve": 17814518.0,
+      "achieved_pct": 125
+    },
+    {
+      "branch": "TVM",
+      "target_value": 27000000.0,
+      "subhiksham": 2117500.0,
+      "viruksham": 22449742.0,
+      "total": 24567242.0,
+      "yet_to_achieve": -2432758.0,
+      "achieved_pct": 91
+    },
+    {
+      "branch": "TPJ",
+      "target_value": 40000000.0,
+      "subhiksham": 2758500.0,
+      "viruksham": 38392966.0,
+      "total": 41151466.0,
+      "yet_to_achieve": 1151466.0,
+      "achieved_pct": 103
+    },
+    {
+      "branch": "CBE",
+      "target_value": 30000000.0,
+      "subhiksham": 2268500.0,
+      "viruksham": 22421809.0,
+      "total": 24690309.0,
+      "yet_to_achieve": -5309691.0,
+      "achieved_pct": 82
+    },
+    {
+      "branch": "SLM",
+      "target_value": 30000000.0,
+      "subhiksham": 1462500.0,
+      "viruksham": 29050841.0,
+      "total": 30513341.0,
+      "yet_to_achieve": 513341.0,
+      "achieved_pct": 102
+    },
+    {
+      "branch": "PNM",
+      "target_value": 20000000.0,
+      "subhiksham": 2483500.0,
+      "viruksham": 15167715.0,
+      "total": 17651215.0,
+      "yet_to_achieve": -2348785.0,
+      "achieved_pct": 88
+    },
+    {
+      "branch": "PADI",
+      "target_value": 54000000.0,
+      "subhiksham": 7102500.0,
+      "viruksham": 55229336.0,
+      "total": 62331836.0,
+      "yet_to_achieve": 8331836.0,
+      "achieved_pct": 115
+    },
+    {
+      "branch": "KANCHI",
+      "target_value": 27000000.0,
+      "subhiksham": 2828000.0,
+      "viruksham": 12360318.0,
+      "total": 15188318.0,
+      "yet_to_achieve": -11811682.0,
+      "achieved_pct": 56
+    },
+    {
+      "branch": "NGL",
+      "target_value": null,
+      "subhiksham": 487000.0,
+      "viruksham": 3275413.0,
+      "total": 3762413.0,
+      "yet_to_achieve": 3762413.0,
+      "achieved_pct": null
+    },
+    {
+      "branch": "ONLINE",
+      "target_value": null,
+      "subhiksham": 2478500.0,
+      "viruksham": 8510424.0,
+      "total": 10988924.0,
+      "yet_to_achieve": 10988924.0,
+      "achieved_pct": null
+    }
+  ],
+  "table2_count_rows": [
+    {
+      "branch": "TVL",
+      "count_target": 3000,
+      "subhiksham": 577,
+      "viruksham": 127,
+      "digi_gold": 856,
+      "digi_silver": 408,
+      "total_count": 1968,
+      "avg": 73
+    },
+    {
+      "branch": "CPT",
+      "count_target": 6000,
+      "subhiksham": 1006,
+      "viruksham": 253,
+      "digi_gold": 2201,
+      "digi_silver": 435,
+      "total_count": 3895,
+      "avg": 144
+    },
+    {
+      "branch": "TVM",
+      "count_target": 4000,
+      "subhiksham": 296,
+      "viruksham": 42,
+      "digi_gold": 1956,
+      "digi_silver": 48,
+      "total_count": 2342,
+      "avg": 87
+    },
+    {
+      "branch": "TPJ",
+      "count_target": 5000,
+      "subhiksham": 567,
+      "viruksham": 93,
+      "digi_gold": 1989,
+      "digi_silver": 699,
+      "total_count": 3348,
+      "avg": 124
+    },
+    {
+      "branch": "CBE",
+      "count_target": 7000,
+      "subhiksham": 438,
+      "viruksham": 76,
+      "digi_gold": 2172,
+      "digi_silver": 965,
+      "total_count": 3651,
+      "avg": 135
+    },
+    {
+      "branch": "SLM",
+      "count_target": 3000,
+      "subhiksham": 278,
+      "viruksham": 90,
+      "digi_gold": 1391,
+      "digi_silver": 488,
+      "total_count": 2247,
+      "avg": 83
+    },
+    {
+      "branch": "PNM",
+      "count_target": 2000,
+      "subhiksham": 266,
+      "viruksham": 46,
+      "digi_gold": 477,
+      "digi_silver": 160,
+      "total_count": 949,
+      "avg": 35
+    },
+    {
+      "branch": "PADI",
+      "count_target": 6000,
+      "subhiksham": 830,
+      "viruksham": 183,
+      "digi_gold": 1560,
+      "digi_silver": 366,
+      "total_count": 2939,
+      "avg": 109
+    },
+    {
+      "branch": "KANCHI",
+      "count_target": null,
+      "subhiksham": 502,
+      "viruksham": 46,
+      "digi_gold": 2471,
+      "digi_silver": 296,
+      "total_count": 3315,
+      "avg": 123
+    },
+    {
+      "branch": "NGL",
+      "count_target": null,
+      "subhiksham": 68,
+      "viruksham": 9,
+      "digi_gold": 190,
+      "digi_silver": 6,
+      "total_count": 273,
+      "avg": 10
+    },
+    {
+      "branch": "E COMM",
+      "count_target": null,
+      "subhiksham": 387,
+      "viruksham": 72,
+      "digi_gold": 5283,
+      "digi_silver": 1017,
+      "total_count": 6759,
+      "avg": 250
+    }
+  ],
+  "rejoining_table_rows": [
+    {
+      "showroom": "TVL",
+      "closed_count": 598,
+      "rejoin_ss": 136,
+      "rejoin_sv": 18,
+      "total_rejoin": 154,
+      "rejoin_percentage": 25.75
+    },
+    {
+      "showroom": "CPT",
+      "closed_count": 1183,
+      "rejoin_ss": 230,
+      "rejoin_sv": 24,
+      "total_rejoin": 254,
+      "rejoin_percentage": 21.47
+    },
+    {
+      "showroom": "TVM",
+      "closed_count": 566,
+      "rejoin_ss": 125,
+      "rejoin_sv": 12,
+      "total_rejoin": 137,
+      "rejoin_percentage": 24.2
+    },
+    {
+      "showroom": "TPJ",
+      "closed_count": 894,
+      "rejoin_ss": 178,
+      "rejoin_sv": 9,
+      "total_rejoin": 187,
+      "rejoin_percentage": 20.92
+    },
+    {
+      "showroom": "CBE",
+      "closed_count": 750,
+      "rejoin_ss": 147,
+      "rejoin_sv": 9,
+      "total_rejoin": 156,
+      "rejoin_percentage": 20.8
+    },
+    {
+      "showroom": "SLM",
+      "closed_count": 366,
+      "rejoin_ss": 54,
+      "rejoin_sv": 7,
+      "total_rejoin": 61,
+      "rejoin_percentage": 16.67
+    },
+    {
+      "showroom": "PNM",
+      "closed_count": 342,
+      "rejoin_ss": 46,
+      "rejoin_sv": 7,
+      "total_rejoin": 53,
+      "rejoin_percentage": 15.5
+    },
+    {
+      "showroom": "PADI",
+      "closed_count": 195,
+      "rejoin_ss": 24,
+      "rejoin_sv": 6,
+      "total_rejoin": 30,
+      "rejoin_percentage": 15.38
+    },
+    {
+      "showroom": "KPM",
+      "closed_count": 1,
+      "rejoin_ss": 0,
+      "rejoin_sv": 0,
+      "total_rejoin": 0,
+      "rejoin_percentage": 0.0
+    }
+  ],
+  "gate_summary": {
+    "passed_checks": [
+      "1.required_source_files_and_worksheets",
+      "2.report_date_cutoff_isolation",
+      "3.expected_showrooms_present",
+      "4.duplicate_and_dropped_records",
+      "5.unresolved_mappings",
+      "6.source_totals_reconciliation",
+      "7.branch_subtotals_reconciliation_revenue_achieved",
+      "7.branch_subtotals_reconciliation_total_achieved_count",
+      "8.rejoining_math_reconciliation",
+      "9.closing_cross_table_reconciliation",
+      "10.required_report_tables_populated",
+      "11.missing_targets_handling",
+      "12.historical_reproducibility",
+      "13.digigold_digisilver_readiness_and_deadline"
+    ],
+    "warnings": [],
+    "critical_failures": []
+  }
+}
