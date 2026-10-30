@@ -1902,12 +1902,12 @@ def run_phase3_consolidation_and_delivery(args: argparse.Namespace, target_date:
         print("\n[FAIL] Phase 3.1 FAILED: Digi synchronization failed.")
         return 1
 
-    # 2. Capture Verified Final Enrollment Screenshot
-    print("\n>>> [Phase 3.2] VERIFIED FINAL ENROLLMENT SCREENSHOT GENERATION")
+    # 2. Capture Verified Final Executive Screenshots (Both Enrollment and Closing)
+    print("\n>>> [Phase 3.2] VERIFIED FINAL EXECUTIVE SCREENSHOTS GENERATION (ENROLLMENT & CLOSING)")
     print("-" * 75)
     screenshot_args = argparse.Namespace(
         report_date=target_date.isoformat(),
-        target="enrollment",
+        target="all",
         output_dir=getattr(args, "output_dir", None),
         dpi=getattr(args, "dpi", 200),
         service_account=getattr(args, "service_account", None),
@@ -1915,21 +1915,21 @@ def run_phase3_consolidation_and_delivery(args: argparse.Namespace, target_date:
     )
     rc_screenshot = cmd_screenshot(screenshot_args)
     if rc_screenshot != 0:
-        print("\n[FAIL] Phase 3.2 FAILED: Verified enrollment screenshot generation failed.")
+        print("\n[FAIL] Phase 3.2 FAILED: Verified executive screenshot generation failed.")
         print("Telegram delivery blocked to prevent distributing unverified reports.")
         return 1
 
     stage4_status = "SUCCESS (MOCK SCREENSHOTS - ZERO WRITES)" if getattr(args, "mock", False) else "SUCCESS"
     print(f"\n[PASS] Phase 3.2: Verified screenshot generation completed: {stage4_status}.")
 
-    # 3. Deliver Final Enrollment Screenshot via Telegram to configured personal recipient
-    print("\n>>> [Phase 3.3] TELEGRAM FINAL ENROLLMENT REPORT DELIVERY")
+    # 3. Deliver Final Executive Screenshots via Telegram to configured personal recipient (Photo 1: Enrollment, Photo 2: Closing)
+    print("\n>>> [Phase 3.3] TELEGRAM EXECUTIVE REPORT DELIVERY (TWO PHOTOS: ENROLLMENT & CLOSING)")
     print("-" * 75)
     tg_args = argparse.Namespace(
         report_date=target_date.isoformat(),
         recipient=getattr(args, "recipient", None),
         screenshot_path=None,
-        target="enrollment",
+        target="all",
         dry_run=getattr(args, "dry_run", False),
         force=getattr(args, "force", False),
         mock=getattr(args, "mock", False),
@@ -2150,59 +2150,76 @@ def cmd_send_telegram(args: argparse.Namespace) -> int:
         print("  python -m app send-telegram --dry-run --report-date 2026-10-20")
         return 1
 
-    # Screenshot selection
-    target_type = getattr(args, "target", "enrollment")
+    # Screenshot selection & delivery
+    target_type = getattr(args, "target", "all")
     screenshot_path_arg = getattr(args, "screenshot_path", None)
+
     if screenshot_path_arg:
-        screenshot_file = Path(screenshot_path_arg).resolve()
-        if not screenshot_file.is_file():
-            print(f"\nERROR: Specified screenshot path not found: {screenshot_file}")
-            return 1
+        resolved_t = target_type if target_type in ("closing", "enrollment") else "enrollment"
+        targets_to_send = [(resolved_t, Path(screenshot_path_arg).resolve())]
+    elif target_type in ("all", "both"):
+        targets_to_send = [("enrollment", None), ("closing", None)]
     else:
-        try:
-            screenshot_file = resolve_telegram_screenshot(
-                report_date=target_date,
-                target=target_type,
-                screenshots_dir=getattr(args, "output_dir", None),
-            )
-        except FileNotFoundError as e:
-            print(f"\nERROR: Screenshot resolution failed: {e}")
-            return 1
+        targets_to_send = [(target_type, None)]
 
-    file_size = screenshot_file.stat().st_size
-    print(f"Screenshot:    {screenshot_file.name} ({file_size:,} bytes)")
-    print(f"File Path:     {screenshot_file}")
+    all_success = True
+    delivered_count = 0
 
-    caption = format_telegram_caption(
-        report_date=target_date,
-        report_title="New Enrollment Report" if "enrollment" in target_type else "Scheme Rejoining Report",
-    )
+    for t_type, explicit_path in targets_to_send:
+        if explicit_path:
+            screenshot_file = explicit_path
+            if not screenshot_file.is_file():
+                print(f"\nERROR: Specified screenshot path not found: {screenshot_file}")
+                return 1
+        else:
+            try:
+                screenshot_file = resolve_telegram_screenshot(
+                    report_date=target_date,
+                    target=t_type,
+                    screenshots_dir=getattr(args, "output_dir", None),
+                )
+            except FileNotFoundError as e:
+                print(f"\nERROR: Screenshot resolution failed for {t_type}: {e}")
+                return 1
 
-    receipt = channel.send_photo(
-        photo_path=screenshot_file,
-        caption=caption,
-        recipient=target_chat_id,
-        report_date=target_date,
-        force=getattr(args, "force", False),
-    )
+        file_size = screenshot_file.stat().st_size
+        print(f"\nReport Target: {t_type.upper()}")
+        print(f"Screenshot:    {screenshot_file.name} ({file_size:,} bytes)")
+        print(f"File Path:     {screenshot_file}")
 
-    masked_recip = redact_chat_id(receipt.recipient)
-    print("\n" + "-" * 70)
-    print("DELIVERY RESULT")
-    print("-" * 70)
-    print(f"Status:           {receipt.status.value}")
-    print(f"Recipient:        {masked_recip}")
-    print(f"Message ID:       {receipt.message_id or '[NONE]'}")
-    print(f"Attachments Sent: {receipt.attachments_sent}")
+        title = "New Enrollment Report" if "enrollment" in t_type else "Scheme Rejoining Report"
+        caption = format_telegram_caption(
+            report_date=target_date,
+            report_title=title,
+        )
 
-    if receipt.status == DeliveryStatus.SENT:
-        print("\nSUCCESS: Telegram executive report delivery completed successfully.")
-        return 0
-    elif receipt.status == DeliveryStatus.DUPLICATE:
-        print(f"\nWARNING: {receipt.error_message}")
+        receipt = channel.send_photo(
+            photo_path=screenshot_file,
+            caption=caption,
+            recipient=target_chat_id,
+            report_date=target_date,
+            force=getattr(args, "force", False),
+        )
+
+        masked_recip = redact_chat_id(receipt.recipient)
+        print("-" * 70)
+        print("DELIVERY RESULT")
+        print("-" * 70)
+        print(f"Status:           {receipt.status.value}")
+        print(f"Recipient:        {masked_recip}")
+        print(f"Message ID:       {receipt.message_id or '[NONE]'}")
+        print(f"Attachments Sent: {receipt.attachments_sent}")
+
+        if receipt.status in (DeliveryStatus.SENT, DeliveryStatus.DUPLICATE):
+            delivered_count += 1
+        else:
+            all_success = False
+
+    if all_success and delivered_count == len(targets_to_send):
+        print(f"\nSUCCESS: Telegram executive report delivery completed successfully ({delivered_count} photos delivered).")
         return 0
     else:
-        print(f"\nFAILURE: {receipt.error_message}")
+        print("\nFAILURE: One or more Telegram report deliveries failed.")
         return 1
 
 
@@ -2591,9 +2608,9 @@ def build_parser() -> argparse.ArgumentParser:
     tg_parser.add_argument(
         "--target",
         type=str,
-        default="enrollment",
-        choices=["enrollment", "closing"],
-        help="Screenshot report target type to deliver ('enrollment' or 'closing')",
+        default="all",
+        choices=["all", "enrollment", "closing"],
+        help="Screenshot report target type to deliver ('all', 'enrollment', or 'closing'). Defaults to 'all' (both reports).",
     )
     tg_parser.add_argument(
         "--dry-run",
