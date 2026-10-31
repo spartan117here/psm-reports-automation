@@ -37,6 +37,7 @@ SHOWROOM_TO_BRANCH: Dict[str, str] = {
     "TRICHY": "TRICHY",
     "NGL": "NAGERCOIL",
     "NAGERCOIL": "NAGERCOIL",
+    "NAGARKOVIL": "NAGERCOIL",
 }
 
 

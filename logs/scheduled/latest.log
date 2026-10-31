@@ -1,0 +1,79 @@
+﻿================================================================================
+WINDOWS TASK SCHEDULER: DAILY REPORTING PIPELINE
+Timestamp:   2026-10-31 16:21:38 +05:30
+User:        DESKTOP-JPCNV36\spart
+Computer:    DESKTOP-JPCNV36
+Directory:   c:\Users\spart\OneDrive\Documents\psm-reports-automation-main
+Python:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\.venv\Scripts\python.exe
+Script:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\scripts\run_independent_daily_pipeline.py
+Log File:    c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\logs\scheduled\daily_pipeline_20261031_162138.log
+================================================================================
+================================================================================
+PRODUCTION AUTOMATED DAILY REPORTING PIPELINE — 30/10/2026
+================================================================================
+Target Report Date:  30/10/2026 (2026-10-30)
+Pipeline Mode:       STRICT_READ_ONLY=true (Zero production sheet mutations)
+Delivery Mode:       LIVE DISPATCH
+================================================================================
+[Stage 1: Schedule Gate] Passed (Current IST: 16:21:41)
+
+[Stage 2: Innervex Download] Downloading / verifying Innervex raw records...
+  Innervex SS:      219 records (from local cache)
+  Innervex SV:      40 records (from local cache)
+  Innervex Closing: 190 records (from local cache)
+
+[Stage 3: Digi Readiness Check] Verifying upstream upload in 'OCT' tab...
+  [PASS] Digi upload confirmed ready: 1,080 records for 30/10/2026 (latest: 2026-10-30)
+  [OK] DigiGold Raw Counts:   E COMM=5,821, Total=22,628
+  [OK] DigiSilver Raw Counts: E COMM=1,140, Total=5,328
+
+[Stage 4: Sheets Historical Data] Fetching historical baseline...
+  Historical SS Rows: 5,722
+  Historical SV Rows: 1,171
+  Closing Snapshot:   5,868 rows (ID: snap_closing_20261030_20261031T103539_8334ea11)
+  [PASS] All pre-delivery business validations passed successfully.
+  [OK] Generated Enrollment Report: enrollment_report_20261030.png (125,450 bytes)
+  [OK] Generated Closing Report:    closing_rejoining_report_20261030.png (83,105 bytes)
+
+[Stage 9: Telegram Delivery] Delivering to 2 authorized recipients...
+  Recipient 16****9109: [SKIPPED] Reports already successfully delivered today.
+  Recipient 91****2037: [SKIPPED] Reports already successfully delivered today.
+
+================================================================================
+TELEGRAM DELIVERY VERIFICATION REPORT
+================================================================================
+Recipient:      Barath (1688169109)
+  Photo 1 (Enrollment): SKIPPED | Message ID: None
+  Photo 2 (Closing):    SKIPPED | Message ID: None
+  Overall Status:       ALREADY_DELIVERED
+--------------------------------------------------------------------------------
+Recipient:      Marketing (9132692037)
+  Photo 1 (Enrollment): SKIPPED | Message ID: None
+  Photo 2 (Closing):    SKIPPED | Message ID: None
+  Overall Status:       ALREADY_DELIVERED
+--------------------------------------------------------------------------------
+
+================================================================================
+PERFORMANCE BENCHMARK EXECUTION SUMMARY
+================================================================================
+  1_schedule_timing_gate             :   0.00s (  0.0%)
+  2_innervex_download                :   0.02s (  0.1%)
+  3_digi_readiness_and_fetch         :   6.11s ( 47.3%)
+  4_sheets_historical_fetch          :   2.26s ( 17.5%)
+  5_data_processing_and_dedup        :   2.91s ( 22.6%)
+  6_rejoining_and_metrics            :   0.90s (  7.0%)
+  7_validation_suite                 :   0.00s (  0.0%)
+  8_image_generation                 :   0.60s (  4.6%)
+  9_telegram_delivery                :   0.00s (  0.0%)
+--------------------------------------------------------------------------------
+  TOTAL EXECUTION TIME               :  12.91s (0.22 minutes)
+  TARGET EXECUTION TIME              : 120 - 180s (2.0 - 3.0 minutes)
+  PERFORMANCE MARGIN                 : 7.2% of allowable limit (167.1s buffer)
+================================================================================
+
+================================================================================
+SCHEDULED EXECUTION FINISHED
+Completion Time: 2026-10-31 16:21:54 +05:30
+Exit Code:       0
+Status:          SUCCESS
+================================================================================

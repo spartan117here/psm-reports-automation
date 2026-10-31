@@ -52,6 +52,7 @@ def test_telegram_config_defaults(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("TELEGRAM_DRY_RUN", raising=False)
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_IDS", raising=False)
 
     bundle = load_config(tmp_path)
     assert bundle.app.telegram.enabled is False
@@ -70,6 +71,7 @@ def test_telegram_config_env_overrides(tmp_path: Path, monkeypatch):
     (config_dir / "mappings.yaml").write_text("mappings: {}\n", encoding="utf-8")
     (config_dir / "targets.yaml").write_text("targets: {}\n", encoding="utf-8")
 
+    monkeypatch.delenv("TELEGRAM_CHAT_IDS", raising=False)
     monkeypatch.setenv("TELEGRAM_ENABLED", "true")
     monkeypatch.setenv("TELEGRAM_DRY_RUN", "false")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456:TEST_TOKEN")
@@ -108,6 +110,7 @@ def test_telegram_config_loads_from_dotenv(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("TELEGRAM_DRY_RUN", raising=False)
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_IDS", raising=False)
 
     bundle = load_config(tmp_path)
     assert bundle.app.telegram.enabled is True

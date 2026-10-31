@@ -47,8 +47,46 @@ from app.reporting.image_renderer import (
 from app.delivery.telegram import (
     TelegramDeliveryChannel,
     format_telegram_caption,
+    redact_chat_id,
 )
+from app.repositories.snapshots import SnapshotManager
 from app.delivery.base import DeliveryStatus
+
+# Comprehensive showroom and location alias mapping to canonical branch codes
+LOC_TO_BRANCH = {
+    # TIRUNELVELI / NELLAI -> TVL
+    "TIRUNELVELI": "TVL", "TIRUNELVELI ECOMM": "TVL", "TIRUNELVELI SV": "TVL", "TIRUNELVELI SV ECOMM": "TVL",
+    "NELLAI": "TVL", "NELLAI ECOMM": "TVL", "NELLAI SV": "TVL", "NELLAI SV ECOMM": "TVL",
+    # CHROMEPET -> CPT
+    "CHROMEPET": "CPT", "CHROMEPET ECOMM": "CPT", "CHROMEPET SV": "CPT", "CHROMEPET SV ECOMM": "CPT",
+    # TRIVANDRUM / TVM -> TVM
+    "TRIVANDRUM": "TVM", "TRIVANDRUM ECOMM": "TVM", "TRIVANDRUM SV": "TVM", "TRIVANDRUM SV ECOMM": "TVM",
+    "TVM": "TVM", "TVM ECOMM": "TVM", "TVM SV": "TVM", "TVM SV ECOMM": "TVM",
+    # TRICHY / TPJ -> TPJ
+    "TRICHY": "TPJ", "TRICHY ECOMM": "TPJ", "TRICHY SV": "TPJ", "TRICHY SV ECOMM": "TPJ",
+    "TPJ": "TPJ", "TPJ ECOMM": "TPJ", "TPJ SV": "TPJ", "TPJ SV ECOMM": "TPJ",
+    # COIMBATORE / CBE -> CBE
+    "COIMBATORE": "CBE", "COIMBATORE ECOMM": "CBE", "COIMBATORE SV": "CBE", "COIMBATORE SV ECOMM": "CBE",
+    "CBE": "CBE", "CBE ECOMM": "CBE", "CBE SV": "CBE", "CBE SV ECOMM": "CBE",
+    # SALEM / SLM -> SLM
+    "SALEM": "SLM", "SALEM ECOMM": "SLM", "SALEM SV": "SLM", "SALEM SV ECOMM": "SLM",
+    "SLM": "SLM", "SLM ECOMM": "SLM", "SLM SV": "SLM", "SLM SV ECOMM": "SLM",
+    # POONAMALLEE / PNM -> PNM
+    "POONAMALLEE": "PNM", "POONAMALLEE ECOMM": "PNM", "POONAMALLEE SV": "PNM", "POONAMALLEE SV ECOMM": "PNM",
+    "PNM": "PNM", "PNM ECOMM": "PNM", "PNM SV": "PNM", "PNM SV ECOMM": "PNM",
+    # PADI -> PADI
+    "PADI": "PADI", "PADI ECOMM": "PADI", "PADI SV": "PADI", "PADI SV ECOMM": "PADI",
+    # KANCHEEPURAM / KANCHI -> KANCHI
+    "KANCHEEPURAM": "KANCHI", "KANCHEEPURAM ECOMM": "KANCHI", "KANCHEEPURAM SV": "KANCHI", "KANCHEEPURAM SV ECOMM": "KANCHI",
+    "KANCHI": "KANCHI", "KANCHI ECOMM": "KANCHI", "KANCHI SV": "KANCHI", "KANCHI SV ECOMM": "KANCHI",
+    # NAGERCOIL / NAGARKOVIL / NGL -> NGL
+    "NAGERCOIL": "NGL", "NAGERCOIL ECOMM": "NGL", "NAGERCOIL SV": "NGL", "NAGERCOIL SV ECOMM": "NGL",
+    "NAGARKOVIL": "NGL", "NAGARKOVIL ECOMM": "NGL", "NAGARKOVIL SV": "NGL", "NAGARKOVIL SV ECOMM": "NGL",
+    "NGL": "NGL", "NGL ECOMM": "NGL", "NGL SV": "NGL", "NGL SV ECOMM": "NGL",
+    # ONLINE / CORPORATE OFFICE -> ONLINE
+    "ONLINE": "ONLINE", "ONLINE SV": "ONLINE", "ONLINE ECOMM": "ONLINE", "ONLINE SV ECOMM": "ONLINE",
+    "CORPORATE OFFICE": "ONLINE", "CORPORATE OFFICE SV": "ONLINE", "CORPORATE OFFICE ECOMM": "ONLINE", "CORPORATE OFFICE SV ECOMM": "ONLINE",
+}
 
 def run_independent_29th_pipeline(dry_run: bool = False):
     target_date = date(2026, 10, 29)
@@ -86,25 +124,38 @@ def run_independent_29th_pipeline(dry_run: bool = False):
     sheet_sv = sheets.read_range(enr_id, "'SV - Oct'!A2:N")
     sheet_close = sheets.read_range(close_id, "'October - 2026'!A2:H")
 
-    print(f"  Historical SS (<= 28-Oct):  {len(sheet_ss)} rows")
-    print(f"  Historical SV (<= 28-Oct):  {len(sheet_sv)} rows")
-    print(f"  Historical Close (<= 28-Oct): {len(sheet_close)} rows")
+    # Snapshot management for immutable source reproduction
+    snap_mgr = SnapshotManager(project_root / "data" / "snapshots")
+    close_snapshot = snap_mgr.get_or_create_snapshot(
+        category="closing",
+        report_date=target_date,
+        records=sheet_close,
+        source_identifier=f"{close_id}::'October - 2026'!A2:H",
+    )
+    sheet_close_records = close_snapshot.records
+
+    print(f"  Source SS Rows:             {len(sheet_ss)} rows")
+    print(f"  Source SV Rows:             {len(sheet_sv)} rows")
+    print(f"  Closing Snapshot Rows:      {len(sheet_close_records)} rows (ID: {close_snapshot.snapshot_id}, SHA: {close_snapshot.sha256[:10]}...)")
 
     # 2. Location Resolver Setup
     loc_resolver = LocationResolver(config_bundle.mappings)
 
-    # Combine Subhiksham (SS)
+    # Combine Subhiksham (SS): Take historical strictly before target_date, plus fresh 29th
+    seen_ss_keys = set()
     combined_ss = []
     for r in sheet_ss:
         dt = parse_date_safe(r[5] if len(r)>5 else "")
-        if dt and dt <= target_date:
+        if dt and dt < target_date:
             amt = float((r[8] if len(r)>8 else "0").replace(",", "").strip() or 0.0)
+            msno = str(r[3] if len(r)>3 else "").strip()
+            seen_ss_keys.add((msno, dt.isoformat()))
             combined_ss.append({
                 "date": dt,
                 "location2": (r[6] if len(r)>6 else "").strip().upper(),
                 "amount": amt,
                 "mobile": normalize_mobile(r[9] if len(r)>9 else ""),
-                "msno": r[3] if len(r)>3 else "",
+                "msno": msno,
                 "name": r[4] if len(r)>4 else "",
             })
 
@@ -114,27 +165,34 @@ def run_independent_29th_pipeline(dry_run: bool = False):
         loc_attr = loc_resolver.resolve(cost_name=item.get("COSTNAME"), comm_code=item.get("COMMCODE"), scheme_type="ss")
         loc2 = loc_attr.location_2.strip().upper()
         mob = normalize_mobile(item.get("MOBILENO"))
-        combined_ss.append({
-            "date": dt,
-            "location2": loc2,
-            "amount": amt,
-            "mobile": mob,
-            "msno": str(item.get("MSNO") or ""),
-            "name": str(item.get("NAME") or ""),
-        })
+        msno = str(item.get("MSNO") or "").strip()
+        key = (msno, dt.isoformat() if dt else "")
+        if key not in seen_ss_keys:
+            seen_ss_keys.add(key)
+            combined_ss.append({
+                "date": dt,
+                "location2": loc2,
+                "amount": amt,
+                "mobile": mob,
+                "msno": msno,
+                "name": str(item.get("NAME") or ""),
+            })
 
-    # Combine Viruksham (SV)
+    # Combine Viruksham (SV): Take historical strictly before target_date, plus fresh 29th
+    seen_sv_keys = set()
     combined_sv = []
     for r in sheet_sv:
         dt = parse_date_safe(r[5] if len(r)>5 else "")
-        if dt and dt <= target_date:
+        if dt and dt < target_date:
             amt = float((r[8] if len(r)>8 else "0").replace(",", "").strip() or 0.0)
+            msno = str(r[3] if len(r)>3 else "").strip()
+            seen_sv_keys.add((msno, dt.isoformat()))
             combined_sv.append({
                 "date": dt,
                 "location2": (r[6] if len(r)>6 else "").strip().upper(),
                 "amount": amt,
                 "mobile": normalize_mobile(r[9] if len(r)>9 else ""),
-                "msno": r[3] if len(r)>3 else "",
+                "msno": msno,
                 "name": r[4] if len(r)>4 else "",
             })
 
@@ -144,46 +202,29 @@ def run_independent_29th_pipeline(dry_run: bool = False):
         loc_attr = loc_resolver.resolve(cost_name=item.get("COSTNAME"), comm_code=item.get("COMMCODE"), scheme_type="sv")
         loc2 = loc_attr.location_2.strip().upper()
         mob = normalize_mobile(item.get("MOBILENO"))
-        combined_sv.append({
-            "date": dt,
-            "location2": loc2,
-            "amount": amt,
-            "mobile": mob,
-            "msno": str(item.get("MSNO") or ""),
-            "name": str(item.get("NAME") or ""),
-        })
+        msno = str(item.get("MSNO") or "").strip()
+        key = (msno, dt.isoformat() if dt else "")
+        if key not in seen_sv_keys:
+            seen_sv_keys.add(key)
+            combined_sv.append({
+                "date": dt,
+                "location2": loc2,
+                "amount": amt,
+                "mobile": mob,
+                "msno": msno,
+                "name": str(item.get("NAME") or ""),
+            })
 
     print(f"\n  [OK] Total Combined SS Rows: {len(combined_ss)}")
     print(f"  [OK] Total Combined SV Rows: {len(combined_sv)}")
 
-    # 3. DigiGold & DigiSilver from OCT Pivot (29-Oct fresh data via DigiSourceReader)
+    # 3. DigiGold & DigiSilver: Independently calculated directly from raw transaction records in 'OCT'
+    print("\n>>> STEP 3: Independently calculating Digi counts from raw 'OCT' records...")
     from app.reporting.digi import DigiSourceReader
     digi_reader = DigiSourceReader(sheets, digi_id)
-    digi_extr = digi_reader.extract_pivot_data("OCT Pivot")
-
-    digi_branch_map = {
-        "NELLAI": "TVL",
-        "CHROMEPET": "CPT",
-        "TRIVANDRUM": "TVM",
-        "TRICHY": "TPJ",
-        "COIMBATORE": "CBE",
-        "SALEM": "SLM",
-        "POONAMALLEE": "PNM",
-        "PADI": "PADI",
-        "KANCHEEPURAM": "KANCHI",
-        "NAGERCOIL": "NGL",
-        "ECOMMERCE": "ONLINE",
-    }
-    branch_dg = defaultdict(int)
-    branch_ds = defaultdict(int)
-
-    for digi_b, val in digi_extr.gold_values.items():
-        target_b = digi_branch_map.get(digi_b, digi_b)
-        branch_dg[target_b] = val
-
-    for digi_b, val in digi_extr.silver_values.items():
-        target_b = digi_branch_map.get(digi_b, digi_b)
-        branch_ds[target_b] = val
+    branch_dg, branch_ds = digi_reader.extract_raw_counts("OCT", target_date)
+    print(f"  [OK] DigiGold Raw Calculations:   E COMM={branch_dg.get('ONLINE', 0):,}, Total={sum(branch_dg.values()):,}")
+    print(f"  [OK] DigiSilver Raw Calculations: E COMM={branch_ds.get('ONLINE', 0):,}, Total={sum(branch_ds.values()):,}")
 
     # 4. Independent Aggregations for Enrollment Report
     target_branches = ["TVL", "CPT", "TVM", "TPJ", "CBE", "SLM", "PNM", "PADI", "KANCHI", "NGL", "ONLINE"]
@@ -198,20 +239,15 @@ def run_independent_29th_pipeline(dry_run: bool = False):
         "KANCHI": None, "NGL": None, "ONLINE": None,
     }
 
-    # Location mapping dictionary to branch codes
-    loc_to_branch = {
-        "TIRUNELVELI": "TVL", "TIRUNELVELI ECOMM": "TVL", "TIRUNELVELI SV": "TVL", "TIRUNELVELI SV ECOMM": "TVL",
-        "CHROMEPET": "CPT", "CHROMEPET ECOMM": "CPT", "CHROMEPET SV": "CPT", "CHROMEPET SV ECOMM": "CPT",
-        "TRIVANDRUM": "TVM", "TRIVANDRUM ECOMM": "TVM", "TRIVANDRUM SV": "TVM",
-        "TRICHY": "TPJ", "TRICHY ECOMM": "TPJ", "TRICHY SV": "TPJ", "TRICHY SV ECOMM": "TPJ",
-        "COIMBATORE": "CBE", "COIMBATORE ECOMM": "CBE", "COIMBATORE SV": "CBE", "COIMBATORE SV ECOMM": "CBE",
-        "SALEM": "SLM", "SALEM ECOMM": "SLM", "SALEM SV": "SLM", "SALEM SV ECOMM": "SLM",
-        "POONAMALLEE": "PNM", "POONAMALLEE ECOMM": "PNM", "POONAMALLEE SV": "PNM",
-        "PADI": "PADI", "PADI ECOMM": "PADI", "PADI SV": "PADI", "PADI SV ECOMM": "PADI",
-        "KANCHEEPURAM": "KANCHI", "KANCHEEPURAM ECOMM": "KANCHI", "KANCHEEPURAM SV": "KANCHI",
-        "NAGARKOVIL": "NGL", "NAGARKOVIL SV": "NGL",
-        "ONLINE": "ONLINE", "ONLINE SV": "ONLINE", "CORPORATE OFFICE": "ONLINE", "CORPORATE OFFICE SV": "ONLINE",
-    }
+    loc_to_branch = LOC_TO_BRANCH
+
+    # Validation: Ensure zero unmapped records are dropped
+    unmapped_ss = [r for r in combined_ss if r["location2"] not in loc_to_branch]
+    unmapped_sv = [r for r in combined_sv if r["location2"] not in loc_to_branch]
+    if unmapped_ss:
+        raise ValueError(f"Unmapped Subhiksham locations detected: {[r['location2'] for r in unmapped_ss[:5]]}")
+    if unmapped_sv:
+        raise ValueError(f"Unmapped Viruksham locations detected: {[r['location2'] for r in unmapped_sv[:5]]}")
 
     table1_rows = []
     table2_rows = []
@@ -261,7 +297,9 @@ def run_independent_29th_pipeline(dry_run: bool = False):
     tot_ss_rev = sum(r["ss"] for r in table1_rows)
     tot_sv_rev = sum(r["sv"] for r in table1_rows)
     tot_comb_rev = tot_ss_rev + tot_sv_rev
-    tot_yet_rev = tot_comb_rev - tot_rev_target
+    # Grand total Yet to Achieve is calculated by summing branch-level Yet to Achieve values.
+    # This properly accounts for KANCHI's target of ₹27M (-₹10,166,916), negative yet values, and non-targeted branches.
+    tot_yet_rev = sum(r["yet"] for r in table1_rows)
     tot_ach_rev_pct = round((tot_comb_rev / tot_rev_target) * 100)
 
     table1_total = {
@@ -305,21 +343,35 @@ def run_independent_29th_pipeline(dry_run: bool = False):
 
     # 5. Independent Scheme Rejoining Calculation
     print("\n>>> STEP 5: Calculating Scheme Rejoining Report for 29/10/2026...")
+    print(f"  Using immutable source snapshot: {close_snapshot.snapshot_id} (SHA: {close_snapshot.sha256[:12]}...)")
     combined_closing = []
-    for r in sheet_close:
+    seen_close_keys = set()
+    for r in sheet_close_records:
+        pb = str(r[2] if len(r) > 2 else "").strip()
+        dt = str(r[0] if len(r) > 0 else "").strip()
+        sh = str(r[7] if len(r) > 7 else "").strip()
         combined_closing.append(r)
+        if pb:
+            seen_close_keys.add((pb, dt, sh))
+
     for row in close_29_rows:
-        row_arr = [
-            row.get("DOCDATE") or "",
-            row.get("NAME") or "",
-            row.get("PASSBOOK") or "",
-            row.get("MOBILE") or "",
-            row.get("SCHEMENAME") or "",
-            str(row.get("WEIGHT") or "0"),
-            row.get("STATUS") or "",
-            row.get("SHOWROOM") or "",
-        ]
-        combined_closing.append(row_arr)
+        pb = str(row.get("PASSBOOK") or "").strip()
+        dt = str(row.get("DOCDATE") or "").strip()
+        sh = str(row.get("SHOWROOM") or "").strip()
+        if not pb or (pb, dt, sh) not in seen_close_keys:
+            if pb:
+                seen_close_keys.add((pb, dt, sh))
+            row_arr = [
+                dt,
+                row.get("NAME") or "",
+                pb,
+                row.get("MOBILE") or "",
+                row.get("SCHEMENAME") or "",
+                str(row.get("WEIGHT") or "0"),
+                row.get("STATUS") or "",
+                sh,
+            ]
+            combined_closing.append(row_arr)
 
     rejoining_ss_input = [{
         "schdate": r["date"],
@@ -341,7 +393,13 @@ def run_independent_29th_pipeline(dry_run: bool = False):
         "name": r["name"],
     } for r in combined_sv]
 
-    matcher = RejoiningMatchingEngine(cutoff_date=target_date, require_enrollment_after_closure=False)
+    matcher = RejoiningMatchingEngine(
+        cutoff_date=target_date,
+        require_enrollment_after_closure=False,
+        mode="month_to_date",
+        snapshot_id=close_snapshot.snapshot_id,
+        snapshot_hash=close_snapshot.sha256,
+    )
     rejoin_res = matcher.process(
         closed_records=combined_closing,
         ss_enrollments=rejoining_ss_input,
@@ -436,42 +494,58 @@ def run_independent_29th_pipeline(dry_run: bool = False):
         enabled=True,
         dry_run=dry_run,
         chat_id=tg_config.chat_id,
+        chat_ids=tg_config.chat_ids,
     )
 
     cap_enr = format_telegram_caption(target_date, "New Enrollment Report")
     cap_rej = format_telegram_caption(target_date, "Scheme Rejoining Report")
 
-    print("\n--- PHOTO 1 DELIVERY ---")
-    print(f"Caption:\n{cap_enr}")
-    res_enr = channel.send_photo(
-        photo_path=out_enr_path,
-        caption=cap_enr,
-        recipient=tg_config.chat_id,
-        report_date=target_date,
-        force=True,
-    )
-    print(f"Result: Status={res_enr.status.value}, Message ID={res_enr.message_id}, Recipient={res_enr.recipient}")
+    target_recipients = channel.configured_chat_ids if channel.configured_chat_ids else ([tg_config.chat_id] if tg_config.chat_id else [])
+    print(f"Target Recipients: {[redact_chat_id(r) for r in target_recipients]}")
 
-    print("\n--- PHOTO 2 DELIVERY ---")
-    print(f"Caption:\n{cap_rej}")
-    res_rej = channel.send_photo(
-        photo_path=out_close_path,
-        caption=cap_rej,
-        recipient=tg_config.chat_id,
-        report_date=target_date,
-        force=True,
-    )
-    print(f"Result: Status={res_rej.status.value}, Message ID={res_rej.message_id}, Recipient={res_rej.recipient}")
+    results = {}
+    total_delivered = 0
+    total_expected = len(target_recipients) * 2
 
-    if res_enr.status == DeliveryStatus.SENT and res_rej.status == DeliveryStatus.SENT:
+    for recip in target_recipients:
+        masked_r = redact_chat_id(recip)
+        print(f"\n--- DELIVERING TO RECIPIENT: {masked_r} ---")
+
+        print(f"Photo 1 (New Enrollment) -> {masked_r}")
+        res_enr = channel.send_photo(
+            photo_path=out_enr_path,
+            caption=cap_enr,
+            recipient=recip,
+            report_date=target_date,
+            force=True,
+        )
+        print(f"  Result: Status={res_enr.status.value}, Message ID={res_enr.message_id}")
+        if res_enr.status == DeliveryStatus.SENT:
+            total_delivered += 1
+
+        print(f"Photo 2 (Scheme Rejoining) -> {masked_r}")
+        res_rej = channel.send_photo(
+            photo_path=out_close_path,
+            caption=cap_rej,
+            recipient=recip,
+            report_date=target_date,
+            force=True,
+        )
+        print(f"  Result: Status={res_rej.status.value}, Message ID={res_rej.message_id}")
+        if res_rej.status == DeliveryStatus.SENT:
+            total_delivered += 1
+
+        results[recip] = {"enrollment": res_enr, "closing": res_rej}
+
+    if total_delivered == total_expected and total_expected > 0:
         print("\n" + "=" * 75)
-        print("SUCCESS: Both 29/10/2026 report images delivered automatically to Telegram!")
-        print(f"Photo 1 Message ID: {res_enr.message_id}")
-        print(f"Photo 2 Message ID: {res_rej.message_id}")
+        print("SUCCESS: Both 29/10/2026 report images delivered automatically to all recipients!")
+        for recip, recs in results.items():
+            print(f"  Recipient {redact_chat_id(recip)}: Photo 1 = {recs['enrollment'].message_id}, Photo 2 = {recs['closing'].message_id}")
         print("=" * 75)
         return 0
     else:
-        print(f"\nFAILURE: Telegram delivery failed. Enr={res_enr.error_message}, Rej={res_rej.error_message}")
+        print(f"\nWARNING: Delivered {total_delivered}/{total_expected} photos. Some recipient deliveries may have failed.")
         return 1
 
 if __name__ == "__main__":

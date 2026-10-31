@@ -48,6 +48,7 @@ SHOWROOM_MAPPING: Dict[str, str] = {
     "KANCHEEPURAM": "KANCHEEPURAM",
     "NGL": "NGL",
     "NAGERCOIL": "NGL",
+    "NAGARKOVIL": "NGL",
 }
 
 DEFAULT_PHYSICAL_SHOWROOMS: List[str] = [
@@ -200,6 +201,9 @@ class RejoiningCalculator:
 class RejoiningReportResult(BaseModel):
     """Consolidated outcome of the Rejoining calculation pipeline."""
     report_date: date
+    mode: str = "daily"
+    snapshot_id: Optional[str] = None
+    snapshot_hash: Optional[str] = None
     table1_rows: List[RejoiningRow]
     table1_summary: RejoiningRow
     table2_weight_rows: List[RejoiningWeightRow]
@@ -225,7 +229,12 @@ class RejoiningMatchingEngine:
 
     Guarantees:
     - Pure historical isolation: only enrollments with date <= cutoff_date are considered.
-    - Zero retroactive mutation: appending future data never affects earlier reports.
+    - Strict month-boundary enforcement: only records within the reporting month are evaluated.
+    - Two explicit modes:
+      * 'daily' (default): strictly enforces cl["docdate"] <= cutoff_date for historical backfills.
+      * 'month_to_date': evaluates all verified closures within the target month tab,
+        accurately reproducing the Google Sheets monthly Pivot Table for daily operational runs.
+    - Zero retroactive mutation: appending future data never affects earlier snapshots.
     - Shared phone transparency: flags ambiguous many-to-one matches for audit.
     - Full three-table reconciliation.
     """
@@ -235,10 +244,23 @@ class RejoiningMatchingEngine:
         cutoff_date: date,
         showrooms: Optional[List[str]] = None,
         require_enrollment_after_closure: bool = False,
+        mode: str = "daily",
+        filter_closed_by_cutoff: Optional[bool] = None,
+        snapshot_id: Optional[str] = None,
+        snapshot_hash: Optional[str] = None,
     ):
         self.cutoff_date = cutoff_date
         self.showrooms = list(showrooms or DEFAULT_PHYSICAL_SHOWROOMS)
         self.require_enrollment_after_closure = require_enrollment_after_closure
+        if filter_closed_by_cutoff is not None:
+            self.mode = "daily" if filter_closed_by_cutoff else "month_to_date"
+        else:
+            norm_mode = mode.lower().strip()
+            if norm_mode not in ("daily", "month_to_date"):
+                raise ValueError(f"Invalid mode '{mode}': must be 'daily' or 'month_to_date'")
+            self.mode = norm_mode
+        self.snapshot_id = snapshot_id
+        self.snapshot_hash = snapshot_hash
 
     def _extract_closed_record(self, raw: Any, index: int) -> Optional[Dict[str, Any]]:
         """Normalize dict or list into standardized closed record dict."""
@@ -381,7 +403,14 @@ class RejoiningMatchingEngine:
                 invalid_date_count += 1
                 continue
 
-            if cl["docdate"] > self.cutoff_date:
+            # 1. Enforce reporting-month boundary in both modes
+            if (cl["docdate"].year != self.cutoff_date.year or 
+                cl["docdate"].month != self.cutoff_date.month):
+                excluded_future_count += 1
+                continue
+
+            # 2. In mode='daily', strictly enforce cl['docdate'] <= cutoff_date
+            if self.mode == "daily" and cl["docdate"] > self.cutoff_date:
                 excluded_future_count += 1
                 continue
 
@@ -547,6 +576,9 @@ class RejoiningMatchingEngine:
 
         return RejoiningReportResult(
             report_date=self.cutoff_date,
+            mode=self.mode,
+            snapshot_id=self.snapshot_id,
+            snapshot_hash=self.snapshot_hash,
             table1_rows=table1_rows,
             table1_summary=table1_summary,
             table2_weight_rows=table2_rows,

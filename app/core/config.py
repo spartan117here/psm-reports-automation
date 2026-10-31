@@ -70,6 +70,7 @@ class TelegramConfig(BaseModel):
     dry_run: bool = True
     bot_token: Optional[str] = None
     chat_id: Optional[str] = None
+    chat_ids: List[str] = Field(default_factory=list)
     timeout_seconds: int = 30
     rate_limit_per_minute: int = 30
     history_file: Path = Path("data/delivery/telegram_history.json")
@@ -291,8 +292,26 @@ def load_config(project_root: Optional[Path] = None) -> AppConfigBundle:
         tg_data["dry_run"] = os.getenv("TELEGRAM_DRY_RUN", "").lower() in ("true", "1", "yes")
     if os.getenv("TELEGRAM_BOT_TOKEN"):
         tg_data["bot_token"] = os.getenv("TELEGRAM_BOT_TOKEN")
-    if os.getenv("TELEGRAM_CHAT_ID"):
-        tg_data["chat_id"] = str(os.getenv("TELEGRAM_CHAT_ID")).strip()
+
+    parsed_chat_ids: List[str] = []
+    raw_chat_ids = os.getenv("TELEGRAM_CHAT_IDS")
+    if raw_chat_ids:
+        for cid in raw_chat_ids.split(","):
+            cid_s = cid.strip()
+            if cid_s and cid_s not in parsed_chat_ids:
+                parsed_chat_ids.append(cid_s)
+
+    raw_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if raw_chat_id:
+        for cid in str(raw_chat_id).split(","):
+            cid_s = cid.strip()
+            if cid_s and cid_s not in parsed_chat_ids:
+                parsed_chat_ids.append(cid_s)
+
+    if parsed_chat_ids:
+        tg_data["chat_ids"] = parsed_chat_ids
+        tg_data["chat_id"] = parsed_chat_ids[0]
+
     if os.getenv("TELEGRAM_TIMEOUT_SECONDS"):
         try:
             tg_data["timeout_seconds"] = int(os.getenv("TELEGRAM_TIMEOUT_SECONDS"))

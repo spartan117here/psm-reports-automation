@@ -2130,16 +2130,26 @@ def cmd_send_telegram(args: argparse.Namespace) -> int:
     )
     from app.delivery.base import DeliveryStatus
 
-    target_chat_id = getattr(args, "recipient", None) or tg_config.chat_id
-    masked_chat = redact_chat_id(target_chat_id)
-    print(f"Recipient:     {masked_chat}")
-
+    target_chat_id = getattr(args, "recipient", None)
     channel = TelegramDeliveryChannel(
         config=tg_config,
         enabled=channel_enabled,
         dry_run=dry_run,
-        chat_id=target_chat_id,
+        chat_id=target_chat_id or tg_config.chat_id,
+        chat_ids=tg_config.chat_ids,
     )
+
+    if target_chat_id:
+        target_recipients = [target_chat_id]
+    elif channel.configured_chat_ids:
+        target_recipients = channel.configured_chat_ids
+    elif tg_config.chat_id:
+        target_recipients = [tg_config.chat_id]
+    else:
+        target_recipients = []
+
+    masked_recips = [redact_chat_id(r) for r in target_recipients]
+    print(f"Recipients:    {', '.join(masked_recips)}")
 
     if not channel.is_enabled():
         print("\nERROR: Telegram delivery channel is disabled (telegram.enabled=false).")
@@ -2164,58 +2174,62 @@ def cmd_send_telegram(args: argparse.Namespace) -> int:
 
     all_success = True
     delivered_count = 0
+    total_expected = len(target_recipients) * len(targets_to_send)
 
-    for t_type, explicit_path in targets_to_send:
-        if explicit_path:
-            screenshot_file = explicit_path
-            if not screenshot_file.is_file():
-                print(f"\nERROR: Specified screenshot path not found: {screenshot_file}")
-                return 1
-        else:
-            try:
-                screenshot_file = resolve_telegram_screenshot(
-                    report_date=target_date,
-                    target=t_type,
-                    screenshots_dir=getattr(args, "output_dir", None),
-                )
-            except FileNotFoundError as e:
-                print(f"\nERROR: Screenshot resolution failed for {t_type}: {e}")
-                return 1
+    for recip in target_recipients:
+        masked_r = redact_chat_id(recip)
+        for t_type, explicit_path in targets_to_send:
+            if explicit_path:
+                screenshot_file = explicit_path
+                if not screenshot_file.is_file():
+                    print(f"\nERROR: Specified screenshot path not found: {screenshot_file}")
+                    return 1
+            else:
+                try:
+                    screenshot_file = resolve_telegram_screenshot(
+                        report_date=target_date,
+                        target=t_type,
+                        screenshots_dir=getattr(args, "output_dir", None),
+                    )
+                except FileNotFoundError as e:
+                    print(f"\nERROR: Screenshot resolution failed for {t_type}: {e}")
+                    return 1
 
-        file_size = screenshot_file.stat().st_size
-        print(f"\nReport Target: {t_type.upper()}")
-        print(f"Screenshot:    {screenshot_file.name} ({file_size:,} bytes)")
-        print(f"File Path:     {screenshot_file}")
+            file_size = screenshot_file.stat().st_size
+            print(f"\nReport Target: {t_type.upper()}")
+            print(f"Screenshot:    {screenshot_file.name} ({file_size:,} bytes)")
+            print(f"Recipient:     {masked_r}")
+            print(f"File Path:     {screenshot_file}")
 
-        title = "New Enrollment Report" if "enrollment" in t_type else "Scheme Rejoining Report"
-        caption = format_telegram_caption(
-            report_date=target_date,
-            report_title=title,
-        )
+            title = "New Enrollment Report" if "enrollment" in t_type else "Scheme Rejoining Report"
+            caption = format_telegram_caption(
+                report_date=target_date,
+                report_title=title,
+            )
 
-        receipt = channel.send_photo(
-            photo_path=screenshot_file,
-            caption=caption,
-            recipient=target_chat_id,
-            report_date=target_date,
-            force=getattr(args, "force", False),
-        )
+            receipt = channel.send_photo(
+                photo_path=screenshot_file,
+                caption=caption,
+                recipient=recip,
+                report_date=target_date,
+                force=getattr(args, "force", False),
+            )
 
-        masked_recip = redact_chat_id(receipt.recipient)
-        print("-" * 70)
-        print("DELIVERY RESULT")
-        print("-" * 70)
-        print(f"Status:           {receipt.status.value}")
-        print(f"Recipient:        {masked_recip}")
-        print(f"Message ID:       {receipt.message_id or '[NONE]'}")
-        print(f"Attachments Sent: {receipt.attachments_sent}")
+            masked_recip = redact_chat_id(receipt.recipient)
+            print("-" * 70)
+            print("DELIVERY RESULT")
+            print("-" * 70)
+            print(f"Status:           {receipt.status.value}")
+            print(f"Recipient:        {masked_recip}")
+            print(f"Message ID:       {receipt.message_id or '[NONE]'}")
+            print(f"Attachments Sent: {receipt.attachments_sent}")
 
-        if receipt.status in (DeliveryStatus.SENT, DeliveryStatus.DUPLICATE):
-            delivered_count += 1
-        else:
-            all_success = False
+            if receipt.status in (DeliveryStatus.SENT, DeliveryStatus.DUPLICATE):
+                delivered_count += 1
+            else:
+                all_success = False
 
-    if all_success and delivered_count == len(targets_to_send):
+    if all_success and delivered_count == total_expected and total_expected > 0:
         print(f"\nSUCCESS: Telegram executive report delivery completed successfully ({delivered_count} photos delivered).")
         return 0
     else:

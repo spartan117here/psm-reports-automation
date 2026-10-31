@@ -314,6 +314,7 @@ class TelegramDeliveryChannel(DeliveryChannel):
         dry_run: Optional[bool] = None,
         bot_token: Optional[str] = None,
         chat_id: Optional[Union[str, int]] = None,
+        chat_ids: Optional[List[Union[str, int]]] = None,
         timeout_seconds: Optional[int] = None,
         history_file: Optional[Path] = None,
     ):
@@ -328,17 +329,43 @@ class TelegramDeliveryChannel(DeliveryChannel):
             or self._config.bot_token
             or os.getenv("TELEGRAM_BOT_TOKEN")
         )
-        raw_chat_id = (
-            chat_id
-            or self._config.chat_id
-            or os.getenv("TELEGRAM_CHAT_ID")
+
+        configured_ids: List[str] = []
+
+        def _add_raw(val: Any) -> None:
+            if val is None:
+                return
+            if isinstance(val, (list, tuple, set)):
+                for item in val:
+                    _add_raw(item)
+                return
+            for part in str(val).split(","):
+                clean = part.strip()
+                if not clean:
+                    continue
+                try:
+                    norm = normalize_chat_id(clean)
+                except ValueError:
+                    norm = clean
+                if norm not in configured_ids:
+                    configured_ids.append(norm)
+
+        # 1. Explicit arguments
+        _add_raw(chat_ids)
+        _add_raw(chat_id)
+
+        # 2. Config object
+        _add_raw(getattr(self._config, "chat_ids", None))
+        _add_raw(self._config.chat_id)
+
+        # 3. Environment variables
+        _add_raw(os.getenv("TELEGRAM_CHAT_IDS"))
+        _add_raw(os.getenv("TELEGRAM_CHAT_ID"))
+
+        self._configured_chat_ids: List[str] = configured_ids
+        self._chat_id: Optional[str] = (
+            self._configured_chat_ids[0] if self._configured_chat_ids else None
         )
-        self._chat_id: Optional[str] = None
-        if raw_chat_id is not None:
-            try:
-                self._chat_id = normalize_chat_id(raw_chat_id)
-            except ValueError:
-                self._chat_id = str(raw_chat_id).strip()
 
         self._timeout = timeout_seconds or self._config.timeout_seconds or 30
         hist_path = history_file or self._config.history_file or Path("data/delivery/telegram_history.json")
@@ -354,8 +381,13 @@ class TelegramDeliveryChannel(DeliveryChannel):
         return self._config.dry_run
 
     @property
+    def configured_chat_ids(self) -> List[str]:
+        """Return list of configured recipient chat IDs."""
+        return list(self._configured_chat_ids)
+
+    @property
     def configured_chat_id(self) -> Optional[str]:
-        """Return configured recipient chat ID."""
+        """Return primary configured recipient chat ID."""
         return self._chat_id
 
     def send_report(
@@ -428,23 +460,19 @@ class TelegramDeliveryChannel(DeliveryChannel):
                 error_message=str(e),
             )
 
-        if self._chat_id:
-            try:
-                norm_configured = normalize_chat_id(self._chat_id)
-                if norm_target != norm_configured:
-                    masked_target = redact_chat_id(norm_target)
-                    masked_config = redact_chat_id(norm_configured)
-                    logger.error(
-                        f"Recipient {masked_target} rejected: Delivery strictly restricted to configured personal chat ID ({masked_config})."
-                    )
-                    return DeliveryReceipt(
-                        channel_name="Telegram",
-                        status=DeliveryStatus.FAILED,
-                        recipient=norm_target,
-                        error_message="Recipient restricted to configured personal chat ID.",
-                    )
-            except ValueError:
-                pass
+        if self._configured_chat_ids:
+            if norm_target not in self._configured_chat_ids:
+                masked_target = redact_chat_id(norm_target)
+                masked_config = ", ".join(redact_chat_id(c) for c in self._configured_chat_ids)
+                logger.error(
+                    f"Recipient {masked_target} rejected: Delivery strictly restricted to configured personal chat ID ({masked_config})."
+                )
+                return DeliveryReceipt(
+                    channel_name="Telegram",
+                    status=DeliveryStatus.FAILED,
+                    recipient=norm_target,
+                    error_message="Recipient restricted to configured personal chat ID.",
+                )
 
         # 2. Check enabled state
         if not self.is_enabled():
@@ -620,6 +648,73 @@ class TelegramDeliveryChannel(DeliveryChannel):
             attachments_sent=1,
         )
 
+    def send_photo_to_all(
+        self,
+        photo_path: Union[str, Path],
+        caption: Optional[str] = None,
+        recipients: Optional[List[Union[str, int]]] = None,
+        report_date: Optional[date] = None,
+        force: bool = False,
+    ) -> Dict[str, DeliveryReceipt]:
+        """
+        Deliver a single verified report photo to all configured recipients independently.
+        Each recipient is delivered to independently so that a failure for one does not
+        prevent delivery to the other. Returns mapping of recipient_id -> DeliveryReceipt.
+        """
+        targets = recipients if recipients is not None else self._configured_chat_ids
+        receipts: Dict[str, DeliveryReceipt] = {}
+        for r in targets:
+            r_str = str(r).strip()
+            receipts[r_str] = self.send_photo(
+                photo_path=photo_path,
+                caption=caption,
+                recipient=r,
+                report_date=report_date,
+                force=force,
+            )
+        return receipts
+
+    def send_two_photos_to_all(
+        self,
+        photo_1_path: Union[str, Path],
+        caption_1: str,
+        photo_2_path: Union[str, Path],
+        caption_2: str,
+        recipients: Optional[List[Union[str, int]]] = None,
+        report_date: Optional[date] = None,
+        force: bool = False,
+    ) -> Dict[str, Dict[str, DeliveryReceipt]]:
+        """
+        Deliver both executive report photos to all configured recipients independently.
+        Recipient delivery is isolated: an error delivering to one recipient will not block
+        delivery to other recipients.
+
+        Returns a mapping:
+            recipient_id -> {"photo_1": DeliveryReceipt, "photo_2": DeliveryReceipt}
+        """
+        targets = recipients if recipients is not None else self._configured_chat_ids
+        results: Dict[str, Dict[str, DeliveryReceipt]] = {}
+        for r in targets:
+            r_str = str(r).strip()
+            results[r_str] = {}
+            # Deliver Photo 1
+            results[r_str]["photo_1"] = self.send_photo(
+                photo_path=photo_1_path,
+                caption=caption_1,
+                recipient=r,
+                report_date=report_date,
+                force=force,
+            )
+            # Deliver Photo 2
+            results[r_str]["photo_2"] = self.send_photo(
+                photo_path=photo_2_path,
+                caption=caption_2,
+                recipient=r,
+                report_date=report_date,
+                force=force,
+            )
+        return results
+
     def send_message(
         self,
         text: str,
@@ -656,23 +751,19 @@ class TelegramDeliveryChannel(DeliveryChannel):
                 error_message=str(e),
             )
 
-        if self._chat_id:
-            try:
-                norm_configured = normalize_chat_id(self._chat_id)
-                if norm_target != norm_configured:
-                    masked_target = redact_chat_id(norm_target)
-                    masked_config = redact_chat_id(norm_configured)
-                    logger.error(
-                        f"Recipient {masked_target} rejected: Delivery strictly restricted to configured personal chat ID ({masked_config})."
-                    )
-                    return DeliveryReceipt(
-                        channel_name="Telegram",
-                        status=DeliveryStatus.FAILED,
-                        recipient=norm_target,
-                        error_message="Recipient restricted to configured personal chat ID.",
-                    )
-            except ValueError:
-                pass
+        if self._configured_chat_ids:
+            if norm_target not in self._configured_chat_ids:
+                masked_target = redact_chat_id(norm_target)
+                masked_config = ", ".join(redact_chat_id(c) for c in self._configured_chat_ids)
+                logger.error(
+                    f"Recipient {masked_target} rejected: Delivery strictly restricted to configured personal chat ID ({masked_config})."
+                )
+                return DeliveryReceipt(
+                    channel_name="Telegram",
+                    status=DeliveryStatus.FAILED,
+                    recipient=norm_target,
+                    error_message="Recipient restricted to configured personal chat ID.",
+                )
 
         if not self.is_enabled():
             logger.info("Telegram delivery is disabled. Skipping message delivery.")

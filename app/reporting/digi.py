@@ -24,6 +24,7 @@ Guarantees:
 - Post-write read-back of the cells this step wrote.
 """
 
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 import json
@@ -769,6 +770,42 @@ class DigiSourceReader:
 
         return max_date, max_date_count, report_date_count
 
+    def check_readiness_and_fetch(
+        self, report_date: date, raw_tab: str
+    ) -> Tuple[bool, int, Optional[date], List[List[Any]]]:
+        """
+        Check if DigiGold/DigiSilver raw data for report_date is uploaded and ready.
+        Reuses fetched rows directly to eliminate duplicate network calls.
+
+        Returns:
+            Tuple of (is_ready, count_for_report_date, max_schdate, raw_data_rows)
+        """
+        logger.info(f"Checking upload readiness in Digi raw tab '{raw_tab}' for {report_date}...")
+        raw_rows = self.sheets_service.read_range(
+            self.spreadsheet_id, f"{raw_tab}!A1:R"
+        )
+        if not raw_rows or len(raw_rows) < 2:
+            return False, 0, None, []
+
+        headers = [str(c).strip().upper() for c in raw_rows[0]]
+        schdate_col_idx = headers.index("SCHDATE") if "SCHDATE" in headers else 5
+
+        count_target = 0
+        max_dt: Optional[date] = None
+
+        for row in raw_rows[1:]:
+            if len(row) > schdate_col_idx and row[schdate_col_idx]:
+                d = parse_schdate(row[schdate_col_idx])
+                if d:
+                    if max_dt is None or d > max_dt:
+                        max_dt = d
+                    if d == report_date:
+                        count_target += 1
+
+        is_ready = (count_target > 0) and (max_dt is not None and max_dt >= report_date)
+        data_rows = raw_rows[1:] if len(raw_rows) > 1 else []
+        return is_ready, count_target, max_dt, data_rows
+
     def extract_pivot_data(self, pivot_tab: str) -> DigiPivotExtraction:
         """
         Extract DigiGold and DigiSilver Achieved Count values, showroom subtotals,
@@ -878,6 +915,70 @@ class DigiSourceReader:
         """
         extraction = self.extract_pivot_data(pivot_tab)
         return extraction.gold_values, extraction.silver_values
+
+    def extract_raw_counts(
+        self,
+        raw_tab: str,
+        report_date: date,
+        raw_rows: Optional[List[List[Any]]] = None,
+    ) -> Tuple[Dict[str, int], Dict[str, int]]:
+        """
+        Independently calculate DigiGold and DigiSilver counts for all branches
+        directly from raw transaction records in raw_tab (e.g. 'OCT') with date cutoff <= report_date.
+
+        Correctly attributes physical showrooms, direct unassisted app transactions,
+        corporate office assisted enrollments, and corporate-assisted e-commerce transactions
+        to E COMM.
+        """
+        logger.info(f"Independently calculating Digi counts from raw tab '{raw_tab}' for {report_date}...")
+        if raw_rows is None:
+            raw_rows = self.sheets_service.read_range(
+                self.spreadsheet_id, f"{raw_tab}!A2:R"
+            )
+        if not raw_rows:
+            raise DigiDataUnavailableError(f"Raw sheet '{raw_tab}' in Digi workbook is empty.")
+
+        showroom_map = {
+            "NELLAI": "TVL",
+            "CHROMEPET": "CPT",
+            "TRIVANDRUM": "TVM",
+            "TRICHY": "TPJ",
+            "COIMBATORE": "CBE",
+            "SALEM": "SLM",
+            "POONAMALLEE": "PNM",
+            "PADI": "PADI",
+            "KANCHEEPURAM": "KANCHI",
+            "NAGERCOIL": "NGL",
+        }
+
+        gold_counts = defaultdict(int)
+        silver_counts = defaultdict(int)
+
+        for r in raw_rows:
+            if len(r) < 10:
+                continue
+
+            costname = str(r[0] if len(r) > 0 else "").strip().upper()
+            dt = parse_schdate(r[5] if len(r) > 5 else "")
+            scheme = str(r[9] if len(r) > 9 else "").strip().upper()
+            branch = str(r[17] if len(r) > 17 else "").strip().upper()
+
+            if not dt or dt > report_date:
+                continue
+
+            is_gold = "GOLD" in scheme
+            is_silver = "SILVER" in scheme
+            if not (is_gold or is_silver):
+                continue
+
+            target_counts = gold_counts if is_gold else silver_counts
+
+            if branch in showroom_map:
+                target_counts[showroom_map[branch]] += 1
+            elif branch in ("#N/A", "", "CORPORATE OFFICE"):
+                target_counts["ONLINE"] += 1
+
+        return dict(gold_counts), dict(silver_counts)
 
     def read_and_validate(
         self,
