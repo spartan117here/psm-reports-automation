@@ -14,7 +14,7 @@ def test_load_config_success(config_bundle: AppConfigBundle):
 
     # Innervex config
     assert config_bundle.innervex.base_url == "http://192.168.5.213:4499"
-    assert config_bundle.innervex.timeout_seconds == 60
+    assert config_bundle.innervex.timeout_seconds == 120
 
     # Reports config
     assert "subhiksham" in config_bundle.reports.reports

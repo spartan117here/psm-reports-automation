@@ -253,7 +253,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         v_amount = ValidationRules.check_amount_sanity(cleaned_records)
         v_unresolved = ValidationRules.check_unresolved_employee_codes(unresolved_codes)
         val_engine.create_report(run_id, [v_dupes, v_amount, v_unresolved])
-
+        
         # 14. Calculate existing store-level aggregation using LocationAggregator
         _set_stage(logger, "AGGREGATION")
         aggregator = LocationAggregator(config_bundle.targets)
@@ -279,7 +279,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             live_service_available = bool((sa_path or sa_json) and spreadsheet_id)
             if live_service_available and sa_path and not Path(sa_path).is_file() and not sa_json:
                 live_service_available = False
-
+            #impoprt null values (git --rebort {!==0})
+            #import args char P{S1: [02::1440::-1]}
             reconcile_res = None
             if live_service_available:
                 try:
@@ -477,7 +478,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     except CriticalValidationError as e:
         logger.critical(f"Critical validation failure: {e.message}")
         run_meta.status = RunStatus.FAILED
-        run_meta.completed_at = datetime.now()
+        run_meta.completed_at =  
+        .now()
         run_meta.notes.append(f"Failed with CriticalValidationError: {e.message}")
         run_repo.save_run(run_meta)
         return 1
@@ -1406,10 +1408,14 @@ def seed_mock_screenshot_data(
     enrollment_id = os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID", "mock_enrollment_id")
     closing_id = os.getenv("GOOGLE_SHEET_CLOSED_REJOINING_ID", "mock_closing_id")
 
+    enr_tab = f"Consolidate Report - {d_enrollment.strftime('%b')}"
+    close_tab = f"{d_closing.strftime('%B')} - {d_closing.year}"
+
     meta_enrollment = {
         "properties": {"title": "New Enrollment from April 2026"},
         "sheets": [
-            {"properties": {"title": "Consolidate Report - Oct", "sheetId": 928019529}},
+            {"properties": {"title": enr_tab, "sheetId": 928019529}},
+            {"properties": {"title": "Consolidate Report - Oct", "sheetId": 928019530}},
         ],
     }
     mock_service.set_metadata(meta_enrollment, spreadsheet_id=enrollment_id)
@@ -1447,13 +1453,16 @@ def seed_mock_screenshot_data(
         ["E COMM", "", "149", "13", "2,449", "487", "3,098", "238"],
         ["Total", "36000", "2034", "345", "10760", "3075", "16214", "1247"],
     ]
+    mock_service.update_range(enrollment_id, f"'{enr_tab}'!E1:M35", enrollment_rows)
+    mock_service.update_range("mock_enrollment_id", f"'{enr_tab}'!E1:M35", enrollment_rows)
     mock_service.update_range(enrollment_id, "'Consolidate Report - Oct'!E1:M35", enrollment_rows)
     mock_service.update_range("mock_enrollment_id", "'Consolidate Report - Oct'!E1:M35", enrollment_rows)
 
     meta_closing = {
         "properties": {"title": "Closed Member & Rejoining Report"},
         "sheets": [
-            {"properties": {"title": "October - 2026", "sheetId": 2105033369}},
+            {"properties": {"title": close_tab, "sheetId": 2105033369}},
+            {"properties": {"title": "October - 2026", "sheetId": 2105033370}},
         ],
     }
     mock_service.set_metadata(meta_closing, spreadsheet_id=closing_id)
@@ -1487,6 +1496,8 @@ def seed_mock_screenshot_data(
         ["", "", "KPM", "11", "64.69", "KPM", "8", "3"],
         ["", "", "TOTAL", "1605", "10881.76", "TOTAL", "1351", "254"],
     ]
+    mock_service.update_range(closing_id, f"'{close_tab}'!J1:R30", closing_rows)
+    mock_service.update_range("mock_closing_id", f"'{close_tab}'!J1:R30", closing_rows)
     mock_service.update_range(closing_id, "'October - 2026'!J1:R30", closing_rows)
     mock_service.update_range("mock_closing_id", "'October - 2026'!J1:R30", closing_rows)
 

@@ -1,6 +1,7 @@
 """Framework-agnostic HTTP client for communicating with Innervex."""
 
 import logging
+import time
 from typing import Any, Dict, Optional
 import requests
 from requests.adapters import HTTPAdapter
@@ -67,15 +68,33 @@ class InnervexClient:
         url = f"{self.config.base_url.rstrip('/')}/{endpoint_path.lstrip('/')}"
         logger.info(f"Dispatching report request to {url}")
 
-        try:
-            response = self.session.post(
-                url,
-                data=form_data,
-                timeout=self.config.timeout_seconds,
-            )
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error while connecting to Innervex: {e}")
-            raise InnervexConnectionError(f"Failed to connect to Innervex at {url}: {e}") from e
+        max_attempts = max(1, self.config.max_retries)
+        last_exception = None
+        response = None
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = self.session.post(
+                    url,
+                    data=form_data,
+                    timeout=self.config.timeout_seconds,
+                )
+                break
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                last_exception = e
+                if attempt < max_attempts:
+                    sleep_time = self.config.backoff_factor ** attempt
+                    logger.warning(
+                        f"Innervex request to {url} timed out or connection failed (attempt {attempt}/{max_attempts}): {e}. "
+                        f"Retrying in {sleep_time:.1f}s..."
+                    )
+                    time.sleep(sleep_time)
+                else:
+                    logger.error(f"Network error while connecting to Innervex after {attempt} attempts: {e}")
+                    raise InnervexConnectionError(f"Failed to connect to Innervex at {url} after {attempt} attempts: {e}") from e
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Network error while connecting to Innervex: {e}")
+                raise InnervexConnectionError(f"Failed to connect to Innervex at {url}: {e}") from e
 
         if response.status_code != 200:
             logger.error(f"Innervex returned HTTP {response.status_code}: {response.text[:200]}")

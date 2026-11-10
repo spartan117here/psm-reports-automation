@@ -8,7 +8,7 @@ Key Features & Safeguards:
 - STRICT_READ_ONLY=true enforced throughout. Zero Google Sheets modifications.
 - Schedule Gate: Waits until 11:31 AM IST before executing production run.
 - Automated Innervex Download: Downloads Subhiksham, Viruksham, and Scheme Closing data directly with local caching.
-- DigiGold/DigiSilver Readiness Check: Verifies data upload in 'OCT' tab with retry loop and alerting before processing.
+- DigiGold/DigiSilver Readiness Check: Verifies data upload in dynamic month tab (e.g. 'NOV', 'OCT') with retry loop and alerting before processing.
 - Zero Stale Cache: In-memory single-pass reading avoids duplicate 28,000+ row network downloads.
 - High Performance: Full execution under 1 minute (benchmarked ~26-50 seconds).
 - Validation Suite: Target checks, showroom code validation, closing balance checks before any delivery.
@@ -63,6 +63,13 @@ from app.delivery.telegram import (
 from app.repositories.snapshots import SnapshotManager
 from app.delivery.base import DeliveryStatus
 from app.reporting.digi import DigiSourceReader
+from app.google_sheets.monthly_source import (
+    MonthlySourceDiscovery,
+    MonthlySourceInfo,
+    MonthlySourceNotFoundError,
+    MonthlySourceHeaderValidationError,
+)
+from app.reporting.calendar import BusinessCalendar
 
 logger = logging.getLogger("independent_pipeline")
 
@@ -266,40 +273,67 @@ def run_pipeline(
     stage_timings["2_innervex_download"] = time.perf_counter() - t0
 
     # -------------------------------------------------------------------------
-    # Stage 3: DigiGold/DigiSilver Source Readiness Check & Single-Pass Fetch
+    # Stage 3: Dynamic Monthly Source Discovery & Digi Readiness Check
     # -------------------------------------------------------------------------
     t0 = time.perf_counter()
     sa_path = str(project_root / "secrets" / "service_account.json")
     sheets = GoogleApiSheetsService(service_account_path=sa_path, read_only=True)
     digi_id = os.getenv("GOOGLE_SHEET_DIGI_ID")
-    digi_reader = DigiSourceReader(sheets, digi_id)
+    enr_id = os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID")
+    close_id = os.getenv("GOOGLE_SHEET_CLOSED_REJOINING_ID")
 
-    print(f"\n[Stage 3: Digi Readiness Check] Verifying upstream upload in 'OCT' tab...")
+    print(f"\n[Stage 3: Source Discovery & Digi Readiness] Discovering worksheets for {target_date_str}...")
+    try:
+        discovery = MonthlySourceDiscovery(sheets)
+        source_info = discovery.discover_sources(
+            report_date=target_date,
+            enrollment_sheet_id=enr_id,
+            closing_sheet_id=close_id,
+            digi_sheet_id=digi_id,
+            validate_headers=True,
+        )
+        print(f"  [DISCOVERED] SS Tab:       '{source_info.ss_tab_name}'")
+        print(f"  [DISCOVERED] SV Tab:       '{source_info.sv_tab_name}'")
+        print(f"  [DISCOVERED] Closing Tab:  '{source_info.closing_tab_name}'")
+        print(f"  [DISCOVERED] Digi Raw Tab: '{source_info.digi_raw_tab_name}'")
+        if source_info.digi_pivot_tab_name:
+            print(f"  [DISCOVERED] Digi Pivot:   '{source_info.digi_pivot_tab_name}'")
+    except Exception as e:
+        err_msg = f"Dynamic monthly source discovery failed for {target_date_str}: {e}"
+        print(f"  [CRITICAL ERROR] {err_msg}")
+        notify_failure(channel, err_msg, target_date)
+        return 1
+
+    digi_reader = DigiSourceReader(sheets, digi_id)
+    raw_digi_tab = source_info.digi_raw_tab_name
+    print(f"\n[Digi Readiness Check] Verifying upstream upload in '{raw_digi_tab}' tab...")
     is_ready = False
-    raw_oct_rows = []
+    raw_digi_rows = []
     attempt = 0
     max_dt = None
 
     while attempt < max_retries:
         attempt += 1
-        is_ready, count_for_date, max_dt, raw_oct_rows = digi_reader.check_readiness_and_fetch(target_date, "OCT")
+        is_ready, count_for_date, max_dt, raw_digi_rows = digi_reader.check_readiness_and_fetch(
+            target_date, raw_digi_tab
+        )
         if is_ready:
             print(f"  [PASS] Digi upload confirmed ready: {count_for_date:,} records for {target_date_str} (latest: {max_dt})")
             break
         else:
-            print(f"  [PENDING] Attempt {attempt}/{max_retries}: Upload for {target_date_str} not ready yet (latest: {max_dt}).")
+            print(f"  [PENDING] Attempt {attempt}/{max_retries}: Upload for {target_date_str} in '{raw_digi_tab}' not ready yet (latest: {max_dt}).")
             if attempt < max_retries:
                 print(f"  Waiting {retry_interval_sec}s before next retry...")
                 time.sleep(retry_interval_sec)
 
     if not is_ready:
-        err_msg = f"DigiGold/DigiSilver data for {target_date_str} is not ready after {attempt} attempts (latest schdate: {max_dt})."
+        err_msg = f"DigiGold/DigiSilver data for {target_date_str} in '{raw_digi_tab}' is not ready after {attempt} attempts (latest schdate: {max_dt})."
         print(f"\n[BLOCKED] {err_msg}")
         notify_failure(channel, err_msg, target_date)
         return 1
 
-    # In-memory single-pass calculation (reuses raw_oct_rows without re-reading sheet)
-    branch_dg, branch_ds = digi_reader.extract_raw_counts("OCT", target_date, raw_rows=raw_oct_rows)
+    # In-memory single-pass calculation (reuses raw_digi_rows without re-reading sheet)
+    branch_dg, branch_ds = digi_reader.extract_raw_counts(raw_digi_tab, target_date, raw_rows=raw_digi_rows)
     print(f"  [OK] DigiGold Raw Counts:   E COMM={branch_dg.get('ONLINE', 0):,}, Total={sum(branch_dg.values()):,}")
     print(f"  [OK] DigiSilver Raw Counts: E COMM={branch_ds.get('ONLINE', 0):,}, Total={sum(branch_ds.values()):,}")
     stage_timings["3_digi_readiness_and_fetch"] = time.perf_counter() - t0
@@ -308,25 +342,22 @@ def run_pipeline(
     # Stage 4: Historical Google Sheets Data Fetch
     # -------------------------------------------------------------------------
     t0 = time.perf_counter()
-    enr_id = os.getenv("GOOGLE_SHEET_NEW_ENROLLMENT_ID")
-    close_id = os.getenv("GOOGLE_SHEET_CLOSED_REJOINING_ID")
-
-    print(f"\n[Stage 4: Sheets Historical Data] Fetching historical baseline...")
-    sheet_ss = sheets.read_range(enr_id, "'SS - Oct'!A2:N")
-    sheet_sv = sheets.read_range(enr_id, "'SV - Oct'!A2:N")
-    sheet_close = sheets.read_range(close_id, "'October - 2026'!A2:H")
+    print(f"\n[Stage 4: Sheets Historical Data] Fetching historical baseline for {source_info.month_name_full} {source_info.year}...")
+    sheet_ss = sheets.read_range(enr_id, f"'{source_info.ss_tab_name}'!A2:N")
+    sheet_sv = sheets.read_range(enr_id, f"'{source_info.sv_tab_name}'!A2:N")
+    sheet_close = sheets.read_range(close_id, f"'{source_info.closing_tab_name}'!A2:H")
 
     snap_mgr = SnapshotManager(project_root / "data" / "snapshots")
     close_snapshot = snap_mgr.get_or_create_snapshot(
         category="closing",
         report_date=target_date,
         records=sheet_close,
-        source_identifier=f"{close_id}::'October - 2026'!A2:H",
+        source_identifier=f"{close_id}::'{source_info.closing_tab_name}'!A2:H",
     )
     sheet_close_records = close_snapshot.records
-    print(f"  Historical SS Rows: {len(sheet_ss):,}")
-    print(f"  Historical SV Rows: {len(sheet_sv):,}")
-    print(f"  Closing Snapshot:   {len(sheet_close_records):,} rows (ID: {close_snapshot.snapshot_id})")
+    print(f"  Historical SS Rows ({source_info.ss_tab_name}): {len(sheet_ss):,}")
+    print(f"  Historical SV Rows ({source_info.sv_tab_name}): {len(sheet_sv):,}")
+    print(f"  Closing Snapshot ({source_info.closing_tab_name}): {len(sheet_close_records):,} rows (ID: {close_snapshot.snapshot_id})")
     stage_timings["4_sheets_historical_fetch"] = time.perf_counter() - t0
 
     # -------------------------------------------------------------------------
@@ -588,8 +619,8 @@ def run_pipeline(
     }
     rejoin_scheme = []
     for r in rejoin_res.table3_scheme_rows:
-        sh_ss = sum(cnt for sch, cnt in r.scheme_counts.items() if "SUBHIKSHAM" in sch.upper() or "SUBIKSHAM" in sch.upper() or "LABHAM" in sch.upper() or sch.upper().startswith("SS"))
         sh_sv = sum(cnt for sch, cnt in r.scheme_counts.items() if "VIRUKSHAM" in sch.upper() or sch.upper().startswith("SV"))
+        sh_ss = sum(cnt for sch, cnt in r.scheme_counts.items() if not ("VIRUKSHAM" in sch.upper() or sch.upper().startswith("SV")))
         rejoin_scheme.append({"showroom": r.showroom, "ss": sh_ss, "sv": sh_sv})
     rejoin_scheme_total = {
         "ss": sum(r["ss"] for r in rejoin_scheme),
@@ -615,6 +646,8 @@ def run_pipeline(
         validation_errors.append(f"Invalid closed weight: {rejoin_weight_total['weight']}")
     if rejoin_scheme_total["ss"] + rejoin_scheme_total["sv"] != rejoin_table1_total["closed"]:
         validation_errors.append(f"SS/SV closing split ({rejoin_scheme_total['ss']}+{rejoin_scheme_total['sv']}) != Total Closed ({rejoin_table1_total['closed']})")
+    if rejoin_res.unresolved_physical_showrooms:
+        validation_errors.append(f"Unresolved physical showroom records found in closing: {rejoin_res.unresolved_physical_showrooms}")
 
     if validation_errors:
         err_msg = "; ".join(validation_errors)
@@ -717,12 +750,18 @@ def main():
 
     args = parser.parse_args()
 
+    calendar = BusinessCalendar()
     if args.date:
-        target_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+        explicit_date = datetime.strptime(args.date, "%Y-%m-%d").date()
+        target_date, is_reporting_day, reason = calendar.resolve_target_date(explicit_date=explicit_date)
     else:
-        # Default to yesterday in IST (per business rule: report_date = today - 1 day)
         now_ist = datetime.now(IST)
-        target_date = now_ist.date() - timedelta(days=1)
+        target_date, is_reporting_day, reason = calendar.resolve_target_date(reference_date=now_ist.date())
+
+    print(f"[Business Calendar] Resolved target date: {target_date.isoformat()} ({reason})")
+    if not is_reporting_day and not args.date:
+        print(f"[Business Calendar] {target_date.isoformat()} is not an active reporting day. Skipping scheduled execution.")
+        sys.exit(0)
 
     rc = run_pipeline(
         target_date=target_date,

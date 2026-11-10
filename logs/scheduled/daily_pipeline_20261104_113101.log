@@ -1,0 +1,38 @@
+﻿================================================================================
+WINDOWS TASK SCHEDULER: DAILY REPORTING PIPELINE
+Timestamp:   2026-11-04 11:31:01 +05:30
+User:        DESKTOP-JPCNV36\spart
+Computer:    DESKTOP-JPCNV36
+Directory:   c:\Users\spart\OneDrive\Documents\psm-reports-automation-main
+Python:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\.venv\Scripts\python.exe
+Script:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\scripts\run_independent_daily_pipeline.py
+Log File:    c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\logs\scheduled\daily_pipeline_20261104_113101.log
+================================================================================
+python.exe : Network error while connecting to Innervex: HTTPConnectionPool(host='192.168.5.213', port=4499): Read 
+timed out. (read timeout=60)
+At C:\Users\spart\OneDrive\Documents\psm-reports-automation-main\scripts\run_scheduled_daily.ps1:63 char:15
++     $rawOut = & $pythonExe $scriptPath @pipelineArgs 2>&1
++               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Network error w...ead timeout=60):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+================================================================================
+PRODUCTION AUTOMATED DAILY REPORTING PIPELINE — 03/11/2026
+================================================================================
+Target Report Date:  03/11/2026 (2026-11-03)
+Pipeline Mode:       STRICT_READ_ONLY=true (Zero production sheet mutations)
+Delivery Mode:       LIVE DISPATCH
+================================================================================
+[Stage 1: Schedule Gate] Passed (Current IST: 11:31:03)
+
+[Stage 2: Innervex Download] Downloading / verifying Innervex raw records...
+  [ERROR] Innervex download failed: Failed to connect to Innervex at http://192.168.5.213:4499/SchemeClosingReport: HTTPConnectionPool(host='192.168.5.213', port=4499): Read timed out. (read timeout=60)
+  [ALERT SENT] Delivered error notification to 16****9109
+  [ALERT SENT] Delivered error notification to 91****2037
+
+================================================================================
+SCHEDULED EXECUTION FINISHED
+Completion Time: 2026-11-04 11:32:33 +05:30
+Exit Code:       1
+Status:          FAILED
+================================================================================

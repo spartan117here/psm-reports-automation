@@ -45,15 +45,20 @@ SHOWROOM_MAPPING: Dict[str, str] = {
     "PNM": "PNM",
     "POONAMALLEE": "PNM",
     "KPM": "KPM",
-    "KANCHEEPURAM": "KANCHEEPURAM",
+    "KANCHI": "KPM",
+    "KANCHEEPURAM": "KPM",
     "NGL": "NGL",
     "NAGERCOIL": "NGL",
     "NAGARKOVIL": "NGL",
 }
 
+SHOWROOM_CANONICAL: Dict[str, str] = SHOWROOM_MAPPING
+
 DEFAULT_PHYSICAL_SHOWROOMS: List[str] = [
-    "TVL", "CPT", "TVM", "TPJ", "CBE", "SLM", "PNM", "PADI", "KPM"
+    "TVL", "CPT", "TVM", "TPJ", "CBE", "SLM", "PNM", "PADI", "KPM", "NGL"
 ]
+
+KNOWN_DIGITAL_SHOWROOMS: Set[str] = {"APP", "ECOM", "HAPP"}
 
 
 def normalize_mobile(val: Any) -> str:
@@ -219,6 +224,7 @@ class RejoiningReportResult(BaseModel):
     total_rejoin_count: int
     overall_rejoin_percentage: float
     unresolved_showrooms: List[str] = Field(default_factory=list)
+    unresolved_physical_showrooms: List[str] = Field(default_factory=list)
     invalid_date_records_count: int = 0
     excluded_future_records_count: int = 0
 
@@ -393,6 +399,7 @@ class RejoiningMatchingEngine:
         eligible_closed: List[Dict[str, Any]] = []
         invalid_date_count = 0
         unresolved_showrooms_set: Set[str] = set()
+        unresolved_physical_showrooms_set: Set[str] = set()
 
         # Track mobile occurrences among closed records to detect shared phone numbers
         phone_closed_counter = Counter()
@@ -415,7 +422,14 @@ class RejoiningMatchingEngine:
                 continue
 
             if cl["showroom"] not in self.showrooms:
-                unresolved_showrooms_set.add(cl["raw_showroom"] or "EMPTY")
+                raw_code = (cl["raw_showroom"] or "EMPTY").strip().upper()
+                unresolved_showrooms_set.add(raw_code)
+                if raw_code not in KNOWN_DIGITAL_SHOWROOMS:
+                    unresolved_physical_showrooms_set.add(raw_code)
+                    logger.warning(
+                        f"Unresolved physical showroom in closed record: raw='{cl['raw_showroom']}', "
+                        f"mapped='{cl['showroom']}', passbook='{cl['passbook']}', name='{cl['name']}'"
+                    )
                 continue
 
             eligible_closed.append(cl)
@@ -594,6 +608,7 @@ class RejoiningMatchingEngine:
             total_rejoin_count=table1_summary.total_rejoin,
             overall_rejoin_percentage=table1_summary.rejoin_percentage,
             unresolved_showrooms=sorted(list(unresolved_showrooms_set)),
+            unresolved_physical_showrooms=sorted(list(unresolved_physical_showrooms_set)),
             invalid_date_records_count=invalid_date_count,
             excluded_future_records_count=excluded_future_count,
         )

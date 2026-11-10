@@ -1,0 +1,10 @@
+﻿================================================================================
+WINDOWS TASK SCHEDULER: DAILY REPORTING PIPELINE
+Timestamp:   2026-11-05 11:31:01 +05:30
+User:        DESKTOP-JPCNV36\spart
+Computer:    DESKTOP-JPCNV36
+Directory:   c:\Users\spart\OneDrive\Documents\psm-reports-automation-main
+Python:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\.venv\Scripts\python.exe
+Script:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\scripts\run_independent_daily_pipeline.py
+Log File:    c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\logs\scheduled\daily_pipeline_20261105_113101.log
+================================================================================

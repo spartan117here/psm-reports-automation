@@ -117,7 +117,7 @@ CLOSING_DISCARDED_COLUMNS: List[str] = [
 ]
 
 # Canonical showroom mapping from raw/pivot names to main summary table showroom labels
-# Main summary table typically uses: TVL, CPT, TVM, TPJ, CBE, SLM, PNM, PADI, KPM
+# Main summary table uses all 10 physical branches: TVL, CPT, TVM, TPJ, CBE, SLM, PNM, PADI, KPM, NGL
 SHOWROOM_MAPPING: Dict[str, str] = {
     "TVC": "TVM",
     "TVM": "TVM",
@@ -139,10 +139,14 @@ SHOWROOM_MAPPING: Dict[str, str] = {
     "PNM": "PNM",
     "POONAMALLEE": "PNM",
     "KPM": "KPM",
-    "KANCHEEPURAM": "KANCHEEPURAM",
+    "KANCHI": "KPM",
+    "KANCHEEPURAM": "KPM",
     "NGL": "NGL",
     "NAGERCOIL": "NGL",
+    "NAGARKOVIL": "NGL",
 }
+
+SHOWROOM_CANONICAL: Dict[str, str] = SHOWROOM_MAPPING
 
 
 def calculate_yesterday_date(target_date: Optional[date] = None) -> date:

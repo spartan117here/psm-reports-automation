@@ -68,3 +68,32 @@ location_naming:
 # Verified master employee registry file
 employee_registry_path: "config/employee_mapping.json"
 
+# Canonical showroom mappings across closing and reporting pipelines
+showroom_canonical:
+  TVC: "TVM"
+  TVM: "TVM"
+  TRIVANDRUM: "TVM"
+  PAD: "PADI"
+  PADI: "PADI"
+  CPT: "CPT"
+  CHROMEPET: "CPT"
+  TVL: "TVL"
+  TIRUNELVELI: "TVL"
+  NELLAI: "TVL"
+  TPJ: "TPJ"
+  TRICHY: "TPJ"
+  TRI: "TPJ"
+  CBE: "CBE"
+  COIMBATORE: "CBE"
+  SLM: "SLM"
+  SALEM: "SLM"
+  PNM: "PNM"
+  POONAMALLEE: "PNM"
+  KPM: "KPM"
+  KANCHI: "KPM"
+  KANCHEEPURAM: "KPM"
+  NGL: "NGL"
+  NAGERCOIL: "NGL"
+  NAGARKOVIL: "NGL"
+
+

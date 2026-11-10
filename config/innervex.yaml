@@ -5,7 +5,7 @@
 innervex:
   # Base network address on company LAN
   base_url: "http://192.168.5.213:4499"
-  timeout_seconds: 60
+  timeout_seconds: 120
   max_retries: 3
   backoff_factor: 2.0
 

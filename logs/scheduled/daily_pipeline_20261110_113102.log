@@ -1,0 +1,55 @@
+﻿================================================================================
+WINDOWS TASK SCHEDULER: DAILY REPORTING PIPELINE
+Timestamp:   2026-11-10 11:31:02 +05:30
+User:        DESKTOP-JPCNV36\spart
+Computer:    DESKTOP-JPCNV36
+Directory:   c:\Users\spart\OneDrive\Documents\psm-reports-automation-main
+Python:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\.venv\Scripts\python.exe
+Script:      c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\scripts\run_independent_daily_pipeline.py
+Log File:    c:\Users\spart\OneDrive\Documents\psm-reports-automation-main\logs\scheduled\daily_pipeline_20261110_113102.log
+================================================================================
+================================================================================
+PRODUCTION AUTOMATED DAILY REPORTING PIPELINE — 09/11/2026
+================================================================================
+Target Report Date:  09/11/2026 (2026-11-09)
+Pipeline Mode:       STRICT_READ_ONLY=true (Zero production sheet mutations)
+Delivery Mode:       LIVE DISPATCH
+================================================================================
+[Stage 1: Schedule Gate] Passed (Current IST: 11:31:06)
+
+[Stage 2: Innervex Download] Downloading / verifying Innervex raw records...
+  Innervex SS:      290 records (freshly downloaded)
+  Innervex SV:      61 records (freshly downloaded)
+  Innervex Closing: 444 records (freshly downloaded)
+
+[Stage 3: Digi Readiness Check] Verifying upstream upload in 'OCT' tab...
+  [PENDING] Attempt 1/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 2/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 3/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 4/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 5/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 6/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 7/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 8/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 9/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+  Waiting 60s before next retry...
+  [PENDING] Attempt 10/10: Upload for 09/11/2026 not ready yet (latest: 2026-11-05).
+
+[BLOCKED] DigiGold/DigiSilver data for 09/11/2026 is not ready after 10 attempts (latest schdate: 2026-11-05).
+  [ALERT SENT] Delivered error notification to 16****9109
+  [ALERT SENT] Delivered error notification to 91****2037
+
+================================================================================
+SCHEDULED EXECUTION FINISHED
+Completion Time: 2026-11-10 11:41:06 +05:30
+Exit Code:       1
+Status:          FAILED
+================================================================================
